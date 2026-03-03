@@ -1,0 +1,23 @@
+User-agent: *
+Allow: /
+
+# Sitemap
+Sitemap: https://leafstrength.app/sitemap.xml
+
+# Crawl-delay para evitar sobrecarga
+Crawl-delay: 10
+
+# Directorios privados (si los hubiera)
+# Disallow: /admin/
+# Disallow: /private/
+
+# Permitir acceso a recursos estáticos
+Allow: /style.css
+Allow: /app.js
+Allow: /sitemap.xml
+Allow: /site.webmanifest
+
+# Bloquear archivos de desarrollo
+Disallow: /*.git
+Disallow: /.env
+Disallow: /README.md

@@ -3,15 +3,109 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mesocycle Tracker</title>
+    
+    <!-- Primary Meta Tags -->
+    <title>LeafStrength - Planificador de Entrenamiento y Mesociclos</title>
+    <meta name="title" content="LeafStrength - Planificador de Entrenamiento y Mesociclos">
+    <meta name="description" content="LeafStrength es tu compañero definitivo para planificar, seguir y optimizar tus entrenamientos de fuerza. Gestiona ejercicios, crea mesociclos personalizados, sigue tu progreso y alcanza tus objetivos fitness.">
+    <meta name="keywords" content="entrenamiento, gimnasio, mesociclos, fitness, fuerza, musculación, planificación, rutinas, ejercicios, progreso, LeafStrength">
+    <meta name="author" content="Manu Montaraz">
+    <meta name="robots" content="index, follow">
+    <meta name="language" content="Spanish">
+    <meta name="revisit-after" content="7 days">
+    
+    <!-- Canonical URL -->
+    <link rel="canonical" href="https://leafstrength.app/">
+    
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://leafstrength.app/">
+    <meta property="og:title" content="LeafStrength - Planificador de Entrenamiento y Mesociclos">
+    <meta property="og:description" content="Tu compañero definitivo para planificar, seguir y optimizar tus entrenamientos de fuerza. Gestiona ejercicios, crea mesociclos personalizados y sigue tu progreso.">
+    <meta property="og:image" content="https://leafstrength.app/og-image.png">
+    <meta property="og:locale" content="es_ES">
+    <meta property="og:site_name" content="LeafStrength by Manu Montaraz">
+    
+    <!-- Twitter -->
+    <meta property="twitter:card" content="summary_large_image">
+    <meta property="twitter:url" content="https://leafstrength.app/">
+    <meta property="twitter:title" content="LeafStrength - Planificador de Entrenamiento y Mesociclos">
+    <meta property="twitter:description" content="Tu compañero definitivo para planificar, seguir y optimizar tus entrenamientos de fuerza. Gestiona ejercicios, crea mesociclos personalizados y sigue tu progreso.">
+    <meta property="twitter:image" content="https://leafstrength.app/og-image.png">
+    
+    <!-- Favicon -->
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌿</text></svg>">
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+    <link rel="manifest" href="/site.webmanifest">
+    
+    <!-- Theme Color -->
+    <meta name="theme-color" content="#6366f1">
+    <meta name="msapplication-TileColor" content="#6366f1">
+    
+    <!-- Preconnect to external domains -->
+    <link rel="preconnect" href="https://cdnjs.cloudflare.com">
+    <link rel="dns-prefetch" href="https://cdnjs.cloudflare.com">
+    
+    <!-- License -->
+    <link rel="license" href="https://www.gnu.org/licenses/agpl-3.0.html">
+    
+    <!-- Humans.txt - We are people, not machines -->
+    <link rel="author" href="/humans.txt">
+    
+    <!-- Stylesheets -->
     <link rel="stylesheet" href="style.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Schema.org Structured Data -->
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "WebApplication",
+        "name": "LeafStrength",
+        "description": "Planificador de entrenamiento y mesociclos para fitness y musculación",
+        "url": "https://leafstrength.app/",
+        "applicationCategory": "HealthApplication",
+        "operatingSystem": "Any",
+        "offers": {
+            "@type": "Offer",
+            "price": "0",
+            "priceCurrency": "EUR"
+        },
+        "featureList": [
+            "Gestión de ejercicios personalizados",
+            "Creación de mesociclos de entrenamiento",
+            "Seguimiento de sesiones",
+            "Registro de records personales",
+            "Estadísticas de progreso",
+            "Exportación e importación de datos"
+        ],
+        "author": {
+            "@type": "Person",
+            "name": "Manu Montaraz",
+            "email": "contacto@manumontaraz.es"
+        },
+        "license": "https://www.gnu.org/licenses/agpl-3.0.html"
+    }
+    </script>
+    
+    <!-- Service Worker Registration -->
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/sw.js')
+                    .then(registration => console.log('SW registered'))
+                    .catch(error => console.log('SW registration failed'));
+            });
+        }
+    </script>
 </head>
 <body>
     <div class="container">
         <header>
-            <h1><i class="fas fa-dumbbell"></i> Mesocycle Tracker</h1>
-            <p>Registro de entrenamientos y mesociclos</p>
+            <h1><i class="fas fa-leaf"></i> LeafStrength</h1>
+            <p>Planificador inteligente de entrenamientos y mesociclos</p>
         </header>
 
         <nav class="tabs">
@@ -722,5 +816,18 @@
             window.gymTracker = new GymTracker();
         });
     </script>
+    
+    <!-- SEO Footer -->
+    <footer style="margin-top: 40px; padding: 20px; text-align: center; border-top: 1px solid var(--border-color); color: var(--text-secondary); font-size: 0.9rem;">
+        <p><strong>LeafStrength</strong> - Tu planificador de entrenamiento inteligente</p>
+        <p style="margin-top: 10px; font-size: 0.8rem;">
+            Gestiona ejercicios, crea mesociclos personalizados, sigue tu progreso y alcanza tus objetivos fitness.
+        </p>
+        <p style="margin-top: 15px; font-size: 0.75rem; opacity: 0.7;">
+            © 2024 Manu Montaraz - Licencia AGPL-3.0 | 
+            <a href="/humans.txt" style="color: var(--primary-light);">humans.txt</a> | 
+            <a href="https://www.gnu.org/licenses/agpl-3.0.html" style="color: var(--primary-light);" target="_blank">AGPL-3.0</a>
+        </p>
+    </footer>
 </body>
 </html>

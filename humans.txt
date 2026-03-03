@@ -1,0 +1,16 @@
+/* TEAM */
+    Developer: Manu Montaraz
+    Contact: contacto@manumontaraz.es
+    Location: Spain
+    
+/* THANKS */
+    Font Awesome - https://fontawesome.com/
+    Chart.js - https://www.chartjs.org/
+    
+/* SITE */
+    Name: LeafStrength
+    Language: Spanish
+    Standards: HTML5, CSS3, ES6+
+    Software: Vanilla JavaScript, LocalStorage
+    License: AGPL-3.0
+    Last update: 2024/01/15

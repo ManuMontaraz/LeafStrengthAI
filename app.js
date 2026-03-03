@@ -1688,7 +1688,7 @@ class GymTracker {
         
         const link = document.createElement('a');
         link.href = url;
-        link.download = `gym-tracker-backup-${new Date().toISOString().split('T')[0]}.json`;
+        link.download = `leafstrength-backup-${new Date().toISOString().split('T')[0]}.json`;
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
@@ -1713,7 +1713,7 @@ class GymTracker {
         
         const link = document.createElement('a');
         link.href = url;
-        link.download = `gym-tracker-ejercicios-${new Date().toISOString().split('T')[0]}.json`;
+        link.download = `leafstrength-ejercicios-${new Date().toISOString().split('T')[0]}.json`;
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
@@ -1738,7 +1738,7 @@ class GymTracker {
         
         const link = document.createElement('a');
         link.href = url;
-        link.download = `gym-tracker-mesociclos-${new Date().toISOString().split('T')[0]}.json`;
+        link.download = `leafstrength-mesociclos-${new Date().toISOString().split('T')[0]}.json`;
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
