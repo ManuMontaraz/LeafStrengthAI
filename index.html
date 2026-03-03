@@ -1,0 +1,585 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mesocycle Tracker</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1><i class="fas fa-dumbbell"></i> Mesocycle Tracker</h1>
+            <p>Registro de entrenamientos y mesociclos</p>
+        </header>
+
+        <nav class="tabs">
+            <button type="button" class="tab-btn active" data-tab="exercises">
+                <i class="fas fa-list"></i> Ejercicios
+            </button>
+            <button type="button" class="tab-btn" data-tab="mesocycles">
+                <i class="fas fa-calendar-alt"></i> Mesociclos
+            </button>
+            <button type="button" class="tab-btn" data-tab="session">
+                <i class="fas fa-play"></i> Sesión
+            </button>
+            <button type="button" class="tab-btn" data-tab="stats">
+                <i class="fas fa-chart-line"></i> Estadísticas
+            </button>
+            <button type="button" class="tab-btn" data-tab="backup">
+                <i class="fas fa-database"></i> Backup
+            </button>
+        </nav>
+
+        <!-- Sección: Ejercicios -->
+        <section id="exercises" class="tab-content active">
+            <div class="card">
+                <h2><i class="fas fa-plus-circle"></i> Nuevo Ejercicio</h2>
+                <form id="exercise-form" data-has-handler="true">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="exercise-name">Nombre del ejercicio</label>
+                            <input type="text" id="exercise-name" required placeholder="Ej: Press de banca">
+                        </div>
+                        <div class="form-group">
+                            <label for="exercise-category">Categoría</label>
+                            <select id="exercise-category" required>
+                                <option value="">Selecciona...</option>
+                                <option value="pecho">Pecho</option>
+                                <option value="espalda">Espalda</option>
+                                <option value="hombros">Hombros</option>
+                                <option value="brazos">Brazos</option>
+                                <option value="piernas">Piernas</option>
+                                <option value="core">Core</option>
+                                <option value="otros">Otros</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="exercise-rm">1RM (kg)</label>
+                            <input type="number" id="exercise-rm" required min="0" step="0.5" placeholder="Tu máximo de una repetición">
+                        </div>
+                        <div class="form-group checkbox-group">
+                            <label>
+                                <input type="checkbox" id="exercise-favorite">
+                                <span class="checkmark"></span>
+                                Añadir a favoritos
+                            </label>
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save"></i> Guardar Ejercicio
+                    </button>
+                </form>
+            </div>
+
+            <div class="card">
+                <h2><i class="fas fa-star"></i> Mis Ejercicios</h2>
+                <div class="filter-row">
+                    <input type="text" id="exercise-search" placeholder="Buscar ejercicio...">
+                    <select id="exercise-filter">
+                        <option value="all">Todos</option>
+                        <option value="favorites">Favoritos</option>
+                        <option value="pecho">Pecho</option>
+                        <option value="espalda">Espalda</option>
+                        <option value="hombros">Hombros</option>
+                        <option value="brazos">Brazos</option>
+                        <option value="piernas">Piernas</option>
+                        <option value="core">Core</option>
+                        <option value="otros">Otros</option>
+                    </select>
+                </div>
+                <div id="exercises-list" class="exercises-grid">
+                    <!-- Ejercicios se cargan dinámicamente -->
+                </div>
+            </div>
+
+            <div class="card">
+                <h2><i class="fas fa-calculator"></i> Calculadora 1RM</h2>
+                <div class="rm-calculator">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="calc-weight">Peso levantado (kg)</label>
+                            <input type="number" id="calc-weight" min="0" step="0.5" placeholder="Peso usado">
+                        </div>
+                        <div class="form-group">
+                            <label for="calc-reps">Repeticiones</label>
+                            <input type="number" id="calc-reps" min="1" max="12" placeholder="Número de reps">
+                        </div>
+                    </div>
+                    <button type="button" onclick="calculateRM()" class="btn btn-secondary">
+                        <i class="fas fa-calculator"></i> Calcular 1RM
+                    </button>
+                    <div id="rm-result" class="rm-result hidden">
+                        <div class="result-box">
+                            <span class="result-label">1RM Estimado:</span>
+                            <span class="result-value" id="rm-value">0</span>
+                            <span class="result-unit">kg</span>
+                        </div>
+                        <div class="percentages-grid">
+                            <div class="percentage-item">
+                                <span>95%</span><span id="rm-95">0</span>
+                            </div>
+                            <div class="percentage-item">
+                                <span>90%</span><span id="rm-90">0</span>
+                            </div>
+                            <div class="percentage-item">
+                                <span>85%</span><span id="rm-85">0</span>
+                            </div>
+                            <div class="percentage-item">
+                                <span>80%</span><span id="rm-80">0</span>
+                            </div>
+                            <div class="percentage-item">
+                                <span>75%</span><span id="rm-75">0</span>
+                            </div>
+                            <div class="percentage-item">
+                                <span>70%</span><span id="rm-70">0</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Sección: Mesociclos -->
+        <section id="mesocycles" class="tab-content">
+            <div class="card">
+                <h2><i class="fas fa-plus-circle"></i> Nuevo Mesociclo</h2>
+                <form id="mesocycle-form" data-has-handler="true">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="meso-name">Nombre del mesociclo</label>
+                            <input type="text" id="meso-name" required placeholder="Ej: Volumen Piernas">
+                        </div>
+                        <div class="form-group">
+                            <label for="meso-duration">Duración (semanas)</label>
+                            <input type="number" id="meso-duration" required min="1" max="12" value="4">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="meso-description">Descripción</label>
+                        <textarea id="meso-description" rows="2" placeholder="Objetivos, notas, etc."></textarea>
+                    </div>
+                    
+                    <div class="exercises-selection">
+                        <h3>Seleccionar Ejercicios</h3>
+                        <div class="filter-row">
+                            <input type="text" id="meso-exercise-search" placeholder="Buscar ejercicio...">
+                            <button type="button" class="btn btn-small" onclick="showFavoritesForMeso()">
+                                <i class="fas fa-star"></i> Ver Favoritos
+                            </button>
+                        </div>
+                        <div id="meso-exercises-list" class="checkbox-exercises-list">
+                            <!-- Lista de ejercicios para seleccionar -->
+                        </div>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save"></i> Crear Mesociclo
+                    </button>
+                </form>
+            </div>
+
+            <div class="card">
+                <h2><i class="fas fa-folder-open"></i> Mis Mesociclos</h2>
+                <div id="mesocycles-list" class="mesocycles-grid">
+                    <!-- Mesociclos se cargan dinámicamente -->
+                </div>
+            </div>
+        </section>
+
+        <!-- Sección: Sesión -->
+        <section id="session" class="tab-content">
+            <div class="card session-header">
+                <div class="session-info">
+                    <select id="active-mesocycle" class="meso-select">
+                        <option value="">Seleccionar mesociclo activo...</option>
+                    </select>
+                    <div class="session-date">
+                        <span id="current-date"></span>
+                    </div>
+                </div>
+                <div class="session-actions">
+                    <button type="button" class="btn btn-secondary" onclick="loadPreviousSession()">
+                        <i class="fas fa-history"></i> Sesión anterior
+                    </button>
+                    <button type="button" class="btn btn-auto" onclick="openAutoSetsModal()" style="background: linear-gradient(135deg, #6366f1, #8b5cf6); color: white;">
+                        <i class="fas fa-robot"></i> Modo Auto
+                    </button>
+                    <button type="button" class="btn btn-primary" onclick="startNewSession()">
+                        <i class="fas fa-play"></i> Nueva sesión
+                    </button>
+                </div>
+            </div>
+
+            <div id="session-content" class="session-content">
+                <div class="empty-state">
+                    <i class="fas fa-dumbbell"></i>
+                    <p>Selecciona un mesociclo para comenzar tu sesión de entrenamiento</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Sección: Estadísticas -->
+        <section id="stats" class="tab-content">
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <i class="fas fa-dumbbell"></i>
+                    <div class="stat-value" id="stat-total-exercises">0</div>
+                    <div class="stat-label">Ejercicios registrados</div>
+                </div>
+                <div class="stat-card">
+                    <i class="fas fa-calendar-check"></i>
+                    <div class="stat-value" id="stat-total-sessions">0</div>
+                    <div class="stat-label">Sesiones completadas</div>
+                </div>
+                <div class="stat-card">
+                    <i class="fas fa-folder"></i>
+                    <div class="stat-value" id="stat-total-mesocycles">0</div>
+                    <div class="stat-label">Mesociclos creados</div>
+                </div>
+                <div class="stat-card">
+                    <i class="fas fa-fire"></i>
+                    <div class="stat-value" id="stat-total-sets">0</div>
+                    <div class="stat-label">Series totales</div>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2><i class="fas fa-chart-bar"></i> Progreso por Ejercicio</h2>
+                <div class="form-group">
+                    <select id="stats-exercise-select">
+                        <option value="">Selecciona un ejercicio...</option>
+                    </select>
+                </div>
+                <div id="exercise-chart" class="chart-container">
+                    <canvas id="progressChart"></canvas>
+                </div>
+                <div id="exercise-stats-detail" class="stats-detail hidden">
+                    <!-- Detalles del ejercicio seleccionado -->
+                </div>
+            </div>
+
+            <div class="card">
+                <h2><i class="fas fa-trophy"></i> Records Personales</h2>
+                <div id="personal-records" class="records-list">
+                    <!-- Records personales -->
+                </div>
+            </div>
+        </section>
+
+        <!-- Sección: Backup -->
+        <section id="backup" class="tab-content">
+            <div class="card">
+                <h2><i class="fas fa-file-export"></i> Exportar Datos</h2>
+                <p style="color: var(--text-secondary); margin-bottom: 20px;">
+                    Descarga una copia de seguridad de todos tus datos: ejercicios, mesociclos y sesiones completadas.
+                </p>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Datos a exportar</label>
+                        <div style="background: var(--bg-color); padding: 15px; border-radius: 8px;">
+                            <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+                                <span>Ejercicios</span>
+                                <span id="export-exercise-count" style="color: var(--primary-light); font-weight: bold;">0</span>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+                                <span>Mesociclos</span>
+                                <span id="export-mesocycle-count" style="color: var(--primary-light); font-weight: bold;">0</span>
+                            </div>
+                            <div style="display: flex; justify-content: space-between;">
+                                <span>Sesiones</span>
+                                <span id="export-session-count" style="color: var(--primary-light); font-weight: bold;">0</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Información del backup</label>
+                        <div style="background: var(--bg-color); padding: 15px; border-radius: 8px;">
+                            <div style="margin-bottom: 8px;">
+                                <strong>Versión:</strong> 1.0
+                            </div>
+                            <div style="margin-bottom: 8px;">
+                                <strong>Fecha:</strong> <span id="export-date">-</span>
+                            </div>
+                            <div>
+                                <strong>Formato:</strong> JSON
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <button type="button" onclick="exportData()" class="btn btn-primary" style="width: 100%;">
+                    <i class="fas fa-download"></i> Descargar Backup
+                </button>
+            </div>
+
+            <div class="card">
+                <h2><i class="fas fa-file-import"></i> Importar Datos</h2>
+                <p style="color: var(--text-secondary); margin-bottom: 20px;">
+                    Restaura tus datos desde un archivo de backup anterior. Puedes elegir entre fusionar con los datos existentes o reemplazarlos completamente.
+                </p>
+                
+                <div class="form-group">
+                    <label for="import-file">Seleccionar archivo JSON</label>
+                    <input type="file" id="import-file" accept=".json" onchange="previewImportFile()" style="padding: 12px; background: var(--bg-color);">
+                </div>
+
+                <div id="import-preview" class="hidden" style="margin: 20px 0; padding: 20px; background: var(--bg-color); border-radius: 8px;">
+                    <h4 style="margin-bottom: 15px; color: var(--primary-light);">Vista previa del archivo</h4>
+                    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-bottom: 15px;">
+                        <div style="text-align: center; padding: 15px; background: var(--card-bg); border-radius: 8px;">
+                            <div style="font-size: 1.5rem; font-weight: bold; color: var(--primary-light);" id="preview-exercises">0</div>
+                            <div style="color: var(--text-secondary); font-size: 0.9rem;">Ejercicios</div>
+                        </div>
+                        <div style="text-align: center; padding: 15px; background: var(--card-bg); border-radius: 8px;">
+                            <div style="font-size: 1.5rem; font-weight: bold; color: var(--primary-light);" id="preview-mesocycles">0</div>
+                            <div style="color: var(--text-secondary); font-size: 0.9rem;">Mesociclos</div>
+                        </div>
+                        <div style="text-align: center; padding: 15px; background: var(--card-bg); border-radius: 8px;">
+                            <div style="font-size: 1.5rem; font-weight: bold; color: var(--primary-light);" id="preview-sessions">0</div>
+                            <div style="color: var(--text-secondary); font-size: 0.9rem;">Sesiones</div>
+                        </div>
+                    </div>
+                    <div style="margin-bottom: 15px;">
+                        <strong>Fecha del backup:</strong> <span id="preview-date">-</span>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Modo de importación</label>
+                        <div style="display: flex; gap: 10px; margin-top: 10px;">
+                            <label style="flex: 1; padding: 15px; background: var(--card-bg); border-radius: 8px; cursor: pointer; border: 2px solid transparent; transition: all 0.3s;">
+                                <input type="radio" name="import-mode" value="merge" checked style="margin-right: 8px;">
+                                <strong>Fusionar</strong><br>
+                                <span style="font-size: 0.85rem; color: var(--text-secondary);">Combina con datos existentes</span>
+                            </label>
+                            <label style="flex: 1; padding: 15px; background: var(--card-bg); border-radius: 8px; cursor: pointer; border: 2px solid transparent; transition: all 0.3s;">
+                                <input type="radio" name="import-mode" value="replace" style="margin-right: 8px;">
+                                <strong>Reemplazar</strong><br>
+                                <span style="font-size: 0.85rem; color: var(--text-secondary);">Elimina datos actuales</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <button type="button" onclick="importData()" class="btn btn-success" style="width: 100%; margin-top: 10px;">
+                        <i class="fas fa-upload"></i> Importar Datos
+                    </button>
+                </div>
+
+                <div id="import-error" class="hidden" style="margin-top: 15px; padding: 15px; background: rgba(239, 68, 68, 0.1); border: 1px solid var(--danger-color); border-radius: 8px; color: var(--danger-color);">
+                    <i class="fas fa-exclamation-triangle"></i> <span id="import-error-message"></span>
+                </div>
+            </div>
+
+            <div class="card" style="border: 1px solid var(--danger-color);">
+                <h2 style="color: var(--danger-color);"><i class="fas fa-exclamation-triangle"></i> Zona de Peligro</h2>
+                <p style="color: var(--text-secondary); margin-bottom: 20px;">
+                    Estas acciones son irreversibles. Asegúrate de haber exportado tus datos antes de continuar.
+                </p>
+                <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                    <button type="button" onclick="clearAllData()" class="btn btn-danger">
+                        <i class="fas fa-trash"></i> Borrar Todos los Datos
+                    </button>
+                    <button type="button" onclick="clearSessionsOnly()" class="btn btn-secondary">
+                        <i class="fas fa-history"></i> Solo Sesiones
+                    </button>
+                </div>
+            </div>
+        </section>
+
+    </div>
+
+    <!-- Modal para editar ejercicio -->
+    <div id="edit-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Editar Ejercicio</h3>
+                <button type="button" class="close-btn" onclick="closeModal('edit-modal')">&times;</button>
+            </div>
+            <form id="edit-exercise-form" data-has-handler="true">
+                <input type="hidden" id="edit-exercise-id">
+                <div class="form-group">
+                    <label for="edit-exercise-name">Nombre</label>
+                    <input type="text" id="edit-exercise-name" required>
+                </div>
+                <div class="form-group">
+                    <label for="edit-exercise-category">Categoría</label>
+                    <select id="edit-exercise-category" required>
+                        <option value="pecho">Pecho</option>
+                        <option value="espalda">Espalda</option>
+                        <option value="hombros">Hombros</option>
+                        <option value="brazos">Brazos</option>
+                        <option value="piernas">Piernas</option>
+                        <option value="core">Core</option>
+                        <option value="otros">Otros</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="edit-exercise-rm">1RM (kg)</label>
+                    <input type="number" id="edit-exercise-rm" required min="0" step="0.5">
+                </div>
+                <div class="form-group checkbox-group">
+                    <label>
+                        <input type="checkbox" id="edit-exercise-favorite">
+                        <span class="checkmark"></span>
+                        Favorito
+                    </label>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('edit-modal')">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Guardar cambios</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal para configurar serie -->
+    <div id="set-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Configurar Serie</h3>
+                <button type="button" class="close-btn" onclick="closeModal('set-modal')">&times;</button>
+            </div>
+            <div class="set-config">
+                <div class="form-group">
+                    <label for="set-percentage">% del 1RM <span id="set-percentage-info" style="color: var(--primary-light); font-size: 0.85rem;"></span></label>
+                    <input type="number" id="set-percentage" min="30" max="100" value="80" step="5">
+                </div>
+                <div class="form-group">
+                    <label for="set-reps">Repeticiones objetivo</label>
+                    <input type="number" id="set-reps" min="1" max="20" value="8">
+                </div>
+                <div class="weight-preview">
+                    <span>Peso calculado: </span>
+                    <strong id="calculated-weight">0 kg</strong>
+                </div>
+                <div id="set-scheme-info" style="margin-top: 15px; padding: 10px; background: var(--bg-color); border-radius: 6px; font-size: 0.85rem; color: var(--text-secondary);">
+                    💡 <strong>Consejo:</strong> Las series se sugieren en escalera ascendente: 70%, 75%, 80%, 85%...
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('set-modal')">Cancelar</button>
+                <button type="button" class="btn btn-primary" onclick="saveSetConfig()">Añadir serie</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal para mesociclo detalle -->
+    <div id="meso-detail-modal" class="modal modal-large">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="meso-detail-title">Detalle del Mesociclo</h3>
+                <button type="button" class="close-btn" onclick="closeModal('meso-detail-modal')">&times;</button>
+            </div>
+            <div id="meso-detail-content" class="meso-detail-content">
+                <!-- Contenido dinámico -->
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('meso-detail-modal')">Cerrar</button>
+                <button type="button" class="btn btn-danger" onclick="deleteCurrentMesocycle()">
+                    <i class="fas fa-trash"></i> Eliminar
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de confirmación para importar -->
+    <div id="import-confirm-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3><i class="fas fa-exclamation-circle"></i> Confirmar Importación</h3>
+                <button type="button" class="close-btn" onclick="closeModal('import-confirm-modal')">&times;</button>
+            </div>
+            <div style="padding: 25px;">
+                <p style="margin-bottom: 20px;">Estás a punto de <strong id="confirm-import-mode">fusionar</strong> los datos. Se importarán:</p>
+                <ul style="margin-bottom: 20px; padding-left: 20px; line-height: 2;">
+                    <li><span id="confirm-exercises">0</span> ejercicios</li>
+                    <li><span id="confirm-mesocycles">0</span> mesociclos</li>
+                    <li><span id="confirm-sessions">0</span> sesiones</li>
+                </ul>
+                <div id="import-replace-warning" class="hidden" style="padding: 15px; background: rgba(239, 68, 68, 0.1); border-radius: 8px; color: var(--danger-color); margin-bottom: 20px;">
+                    <i class="fas fa-exclamation-triangle"></i> <strong>Advertencia:</strong> Se eliminarán todos los datos actuales y se reemplazarán con los del archivo.
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('import-confirm-modal')">Cancelar</button>
+                <button type="button" class="btn btn-primary" onclick="confirmImport()">Confirmar Importación</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal para series automáticas -->
+    <div id="auto-sets-modal" class="modal modal-large">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3><i class="fas fa-robot"></i> Generador Inteligente de Series</h3>
+                <button type="button" class="close-btn" onclick="closeModal('auto-sets-modal')">&times;</button>
+            </div>
+            <div style="padding: 25px; max-height: 70vh; overflow-y: auto;">
+                <div id="auto-sets-no-session" class="hidden">
+                    <p style="text-align: center; color: var(--text-secondary); padding: 20px;">
+                        <i class="fas fa-info-circle" style="font-size: 2rem; margin-bottom: 10px; display: block;"></i>
+                        No hay una sesión activa. Inicia una sesión primero.
+                    </p>
+                </div>
+                
+                <div id="auto-sets-content">
+                    <p style="color: var(--text-secondary); margin-bottom: 20px;">
+                        El Automatrón analizará tu historial y generará series óptimas para cada ejercicio basándose en tu progreso y el objetivo del mesociclo.
+                    </p>
+                    
+                    <div class="form-group" style="margin-bottom: 20px;">
+                        <label>Objetivo de la sesión</label>
+                        <select id="auto-sets-objective" style="width: 100%; padding: 10px; background: var(--bg-color); border: 1px solid var(--border-color); border-radius: 8px; color: var(--text-primary);">
+                            <option value="auto">🤖 Automático (basado en mesociclo)</option>
+                            <option value="strength">💪 Fuerza</option>
+                            <option value="hypertrophy">🏋️ Hipertrofia</option>
+                            <option value="endurance">🔥 Resistencia</option>
+                            <option value="power">⚡ Potencia</option>
+                            <option value="deload">😌 Descarga</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-row" style="margin-bottom: 20px;">
+                        <div class="form-group">
+                            <label>Intensidad</label>
+                            <select id="auto-sets-intensity" style="width: 100%; padding: 10px; background: var(--bg-color); border: 1px solid var(--border-color); border-radius: 8px; color: var(--text-primary);">
+                                <option value="conservative">Conservadora (fácil)</option>
+                                <option value="moderate" selected>Moderada</option>
+                                <option value="aggressive">Agresiva (difícil)</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Número de series por ejercicio</label>
+                            <input type="number" id="auto-sets-count" min="1" max="10" value="3" style="width: 100%; padding: 10px; background: var(--bg-color); border: 1px solid var(--border-color); border-radius: 8px; color: var(--text-primary);">
+                        </div>
+                    </div>
+                    
+                    <div id="auto-sets-preview" style="margin-top: 20px;">
+                        <h4 style="color: var(--primary-light); margin-bottom: 15px;">Vista previa:</h4>
+                        <div id="auto-sets-exercises-list" style="background: var(--bg-color); border-radius: 8px; padding: 15px;">
+                            <!-- Se llena dinámicamente -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('auto-sets-modal')">Cancelar</button>
+                <button type="button" class="btn btn-primary" onclick="generateAutoSets()" style="background: linear-gradient(135deg, #6366f1, #8b5cf6);">
+                    <i class="fas fa-magic"></i> Generar Series
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="app.js"></script>
+    <script>
+        // Inicializar la aplicación cuando el DOM esté listo
+        document.addEventListener('DOMContentLoaded', function() {
+            window.gymTracker = new GymTracker();
+        });
+    </script>
+</body>
+</html>
