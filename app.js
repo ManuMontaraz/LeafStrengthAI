@@ -7,6 +7,7 @@ class GymTracker {
         this.currentSession = null;
         this.currentSetExercise = null;
         this.currentMesoDetail = null;
+        this.selectedMesoExercises = new Set(); // Para mantener selecciones persistentes
         
         this.init();
     }
@@ -106,6 +107,15 @@ class GymTracker {
                 console.warn('Submit no manejado detectado y prevenido:', form);
             }
         }, true);
+
+        // Cambio de mesociclo activo - limpiar sesión actual
+        document.getElementById('active-mesocycle').addEventListener('change', () => {
+            if (this.currentSession) {
+                this.currentSession = null;
+                localStorage.removeItem('gym_current_session');
+                this.renderSession();
+            }
+        });
     }
 
     switchTab(tabId) {
@@ -391,53 +401,99 @@ class GymTracker {
         
         let filtered = this.exercises.filter(ex => {
             const matchesSearch = ex.name.toLowerCase().includes(searchTerm);
+            
+            // Manejar filtro de favoritos
+            if (categoryFilter === 'favorites') {
+                return matchesSearch && ex.favorite;
+            }
+            
             const matchesCategory = categoryFilter === 'all' || ex.category === categoryFilter;
             return matchesSearch && matchesCategory;
         });
 
         if (filtered.length === 0) {
-            container.innerHTML = '<p class="text-center" style="color: var(--text-secondary); padding: 20px;">No hay ejercicios disponibles</p>';
-            return;
-        }
-
-        container.innerHTML = filtered.map(ex => `
-            <label class="checkbox-exercise-item">
-                <input type="checkbox" value="${ex.id}" data-name="${ex.name}" data-rm="${ex.rm}" data-category="${ex.category}">
-                <div class="exercise-info">
-                    <div class="exercise-name">${ex.name}</div>
-                    <div class="exercise-rm">1RM: ${ex.rm}kg - ${this.getCategoryName(ex.category)}</div>
-                </div>
-            </label>
-        `).join('');
-    }
-
-    showFavoritesForMeso() {
-        const categoryFilter = document.getElementById('meso-exercise-filter').value;
-        
-        // Filtrar favoritos respetando el filtro de categoría actual
-        let favorites = this.exercises.filter(e => e.favorite);
-        if (categoryFilter !== 'all') {
-            favorites = favorites.filter(e => e.category === categoryFilter);
-        }
-        
-        const container = document.getElementById('meso-exercises-list');
-        if (favorites.length === 0) {
-            const message = categoryFilter === 'all' 
-                ? 'No tienes ejercicios favoritos'
-                : `No tienes ejercicios favoritos en la categoría "${this.getCategoryName(categoryFilter)}"`;
+            let message = 'No hay ejercicios disponibles';
+            if (categoryFilter === 'favorites') {
+                message = 'No tienes ejercicios favoritos';
+            } else if (categoryFilter !== 'all') {
+                message = `No hay ejercicios en la categoría "${this.getCategoryName(categoryFilter)}"`;
+            }
             container.innerHTML = `<p class="text-center" style="color: var(--text-secondary); padding: 20px;">${message}</p>`;
+            this.updateMesoSelectedCount();
             return;
         }
 
-        container.innerHTML = favorites.map(ex => `
+        container.innerHTML = filtered.map(ex => {
+            const isSelected = this.selectedMesoExercises.has(ex.id);
+            return `
             <label class="checkbox-exercise-item">
-                <input type="checkbox" value="${ex.id}" data-name="${ex.name}" data-rm="${ex.rm}" data-category="${ex.category}" checked>
+                <input type="checkbox" value="${ex.id}" data-name="${ex.name}" data-rm="${ex.rm}" data-category="${ex.category}" 
+                       ${isSelected ? 'checked' : ''} onchange="gymTracker.toggleMesoExerciseSelection(this)">
                 <div class="exercise-info">
-                    <div class="exercise-name">${ex.name}</div>
+                    <div class="exercise-name">${ex.name} ${ex.favorite ? '⭐' : ''}</div>
                     <div class="exercise-rm">1RM: ${ex.rm}kg - ${this.getCategoryName(ex.category)}</div>
                 </div>
             </label>
-        `).join('');
+        `}).join('');
+        
+        this.updateMesoSelectedCount();
+    }
+    
+    toggleMesoExerciseSelection(checkbox) {
+        const exerciseId = checkbox.value;
+        if (checkbox.checked) {
+            this.selectedMesoExercises.add(exerciseId);
+        } else {
+            this.selectedMesoExercises.delete(exerciseId);
+        }
+        this.updateMesoSelectedCount();
+    }
+    
+    updateMesoSelectedCount() {
+        const count = this.selectedMesoExercises.size;
+        const countEl = document.getElementById('meso-selected-count');
+        if (countEl) {
+            countEl.textContent = `(${count} seleccionados)`;
+        }
+    }
+    
+    selectAllMesoExercises() {
+        const checkboxes = document.querySelectorAll('#meso-exercises-list input[type="checkbox"]');
+        checkboxes.forEach(cb => {
+            if (!cb.checked) {
+                cb.checked = true;
+                this.selectedMesoExercises.add(cb.value);
+            }
+        });
+        this.updateMesoSelectedCount();
+        this.showNotification(`${checkboxes.length} ejercicios seleccionados`, 'success');
+    }
+    
+    deselectAllMesoExercises() {
+        const checkboxes = document.querySelectorAll('#meso-exercises-list input[type="checkbox"]:checked');
+        checkboxes.forEach(cb => {
+            cb.checked = false;
+            this.selectedMesoExercises.delete(cb.value);
+        });
+        this.updateMesoSelectedCount();
+        this.showNotification(`${checkboxes.length} ejercicios deseleccionados`, 'info');
+    }
+    
+    clearAllMesoSelections() {
+        if (this.selectedMesoExercises.size === 0) {
+            this.showNotification('No hay ejercicios seleccionados', 'info');
+            return;
+        }
+        
+        const count = this.selectedMesoExercises.size;
+        this.selectedMesoExercises.clear();
+        
+        // Actualizar todos los checkboxes visibles
+        const checkboxes = document.querySelectorAll('#meso-exercises-list input[type="checkbox"]:checked');
+        checkboxes.forEach(cb => cb.checked = false);
+        
+        this.updateMesoSelectedCount();
+        this.showNotification(`${count} selecciones eliminadas`, 'success');
     }
 
     addMesocycle() {
@@ -446,11 +502,12 @@ class GymTracker {
         const description = document.getElementById('meso-description').value.trim();
         const split = document.getElementById('meso-split').value;
         const objective = document.getElementById('meso-objetivo').value;
+        const maxExercisesPerSession = parseInt(document.getElementById('meso-max-exercises').value) || 6;
         
-        // Obtener ejercicios seleccionados
+        // Obtener ejercicios seleccionados desde el Set persistente
         const selectedExercises = [];
-        document.querySelectorAll('#meso-exercises-list input[type="checkbox"]:checked').forEach(cb => {
-            const exercise = this.exercises.find(e => e.id === cb.value);
+        this.selectedMesoExercises.forEach(exerciseId => {
+            const exercise = this.exercises.find(e => e.id === exerciseId);
             if (exercise) {
                 selectedExercises.push({
                     exerciseId: exercise.id,
@@ -474,6 +531,7 @@ class GymTracker {
             description,
             split,
             objective,
+            maxExercisesPerSession,
             exercises: selectedExercises,
             createdAt: new Date().toISOString(),
             completedSessions: 0
@@ -482,7 +540,11 @@ class GymTracker {
         this.mesocycles.push(mesocycle);
         this.saveToStorage();
         
+        // Limpiar selecciones
+        this.selectedMesoExercises.clear();
+        
         document.getElementById('mesocycle-form').reset();
+        this.updateSplitInfo();
         this.renderMesoExercisesList();
         this.renderMesocycles();
         this.updateStats();
@@ -516,6 +578,10 @@ class GymTracker {
                 mixed: 'Mixto'
             };
             
+            const maxExText = meso.maxExercisesPerSession 
+                ? `<span style="background: var(--warning-color); color: white; padding: 3px 10px; border-radius: 12px; font-size: 0.8rem;"><i class="fas fa-layer-group"></i> Máx ${meso.maxExercisesPerSession}/sesión</span>`
+                : '';
+            
             return `
             <div class="mesocycle-card" onclick="gymTracker.showMesocycleDetail('${meso.id}')">
                 <h4>${meso.name}</h4>
@@ -530,6 +596,7 @@ class GymTracker {
                     <span style="background: var(--secondary-color); color: white; padding: 3px 10px; border-radius: 12px; font-size: 0.8rem;">
                         ${objectiveNames[meso.objective] || 'Mixto'}
                     </span>
+                    ${maxExText}
                 </div>
                 <p class="meso-description">${meso.description || 'Sin descripción'}</p>
             </div>
@@ -567,7 +634,10 @@ class GymTracker {
                 <strong>Duración:</strong> ${meso.duration} semanas<br>
                 <strong>Ejercicios:</strong> ${meso.exercises.length}<br>
                 <strong>Sesiones completadas:</strong> ${meso.completedSessions || 0}<br>
-                <strong>Días de entrenamiento:</strong> ${splitInfo.sessions.length > 0 ? splitInfo.sessions.length : 'Variable'}
+                <strong>Días de entrenamiento:</strong> ${splitInfo.sessions.length > 0 ? splitInfo.sessions.length : 'Variable'}<br>
+                <strong>Máx. ejercicios por sesión:</strong> ${meso.maxExercisesPerSession || 'Todos'}<br>
+                ${meso.maxExercisesPerSession && meso.exercises.length > meso.maxExercisesPerSession ? 
+                    `<span style="color: var(--warning-color);"><i class="fas fa-sync-alt"></i> Rotación de ejercicios activada</span>` : ''}
             </div>
             
             ${splitInfo.sessions.length > 0 ? `
@@ -661,16 +731,41 @@ class GymTracker {
         }
 
         // Filtrar ejercicios que coincidan con las categorías del día
-        const selectedExercises = meso.exercises.filter(ex => 
+        let filteredExercises = meso.exercises.filter(ex => 
             targetCategories.includes(ex.category)
         );
 
-        if (selectedExercises.length === 0) {
+        if (filteredExercises.length === 0) {
             this.showNotification(`No hay ejercicios de ${sessionName} en este mesociclo. Verifica las categorías de los ejercicios.`, 'warning');
             return;
         }
 
-        // Crear la sesión con los ejercicios filtrados
+        // Aplicar límite máximo de ejercicios por sesión con rotación
+        const maxExercises = meso.maxExercisesPerSession || filteredExercises.length;
+        let selectedExercises;
+        
+        if (filteredExercises.length <= maxExercises) {
+            // Si hay menos ejercicios que el máximo, usarlos todos
+            selectedExercises = filteredExercises;
+        } else {
+            // Rotar ejercicios basado en el número de sesión
+            // Calculamos qué bloque de ejercicios corresponde a esta sesión
+            const totalExercises = filteredExercises.length;
+            const sessionsNeeded = Math.ceil(totalExercises / maxExercises);
+            const sessionIndex = ((sessionNumber - 1) % sessionsNeeded);
+            
+            const startIndex = sessionIndex * maxExercises;
+            const endIndex = Math.min(startIndex + maxExercises, totalExercises);
+            
+            selectedExercises = filteredExercises.slice(startIndex, endIndex);
+            
+            // Si llegamos al final y quedan ejercicios sueltos, los mostramos en la siguiente sesión
+            if (selectedExercises.length === 0 && totalExercises > 0) {
+                selectedExercises = filteredExercises.slice(0, maxExercises);
+            }
+        }
+
+        // Crear la sesión con los ejercicios seleccionados
         this.currentSession = {
             id: this.generateId(),
             mesocycleId: mesoId,
@@ -691,7 +786,12 @@ class GymTracker {
 
         localStorage.setItem('gym_current_session', JSON.stringify(this.currentSession));
         this.renderSession();
-        this.showNotification(`Sesión ${sessionNumber}: ${sessionName} - ${selectedExercises.length} ejercicios`, 'success');
+        
+        const totalInCategory = filteredExercises.length;
+        const showingText = totalInCategory > maxExercises 
+            ? `(${selectedExercises.length} de ${totalInCategory} - rotación)` 
+            : `(${selectedExercises.length} ejercicios)`;
+        this.showNotification(`Sesión ${sessionNumber}: ${sessionName} ${showingText}`, 'success');
     }
 
     renderSessionExercisesList(meso) {
@@ -1656,10 +1756,6 @@ function calculateRM() {
     gymTracker.calculateRM();
 }
 
-function showFavoritesForMeso() {
-    gymTracker.showFavoritesForMeso();
-}
-
 function closeModal(modalId) {
     gymTracker.closeModal(modalId);
 }
@@ -1694,6 +1790,18 @@ function exportMesocyclesOnly() {
 
 function filterSessionHistory() {
     gymTracker.renderSessionsHistory();
+}
+
+function selectAllMesoExercises() {
+    gymTracker.selectAllMesoExercises();
+}
+
+function deselectAllMesoExercises() {
+    gymTracker.deselectAllMesoExercises();
+}
+
+function clearAllMesoSelections() {
+    gymTracker.clearAllMesoSelections();
 }
 
 function previewImportFile() {
