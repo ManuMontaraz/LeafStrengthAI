@@ -393,6 +393,63 @@ class GymTracker {
         return config.sessions[sessionIndex].categories;
     }
 
+    getSessionsPerWeek(split) {
+        const config = this.getSplitConfig()[split];
+        if (!config || config.sessions.length === 0) return 1;
+        return config.sessions.length;
+    }
+
+    // Genera un orden aleatorio de ejercicios para todo el mesociclo
+    getMesocycleExerciseOrder(mesoId, exercises, seed) {
+        const storageKey = `gym_meso_order_${mesoId}`;
+        const savedOrder = localStorage.getItem(storageKey);
+        
+        if (savedOrder) {
+            const order = JSON.parse(savedOrder);
+            // Reconstruir el array de ejercicios en el orden guardado
+            return order.map(id => exercises.find(ex => ex.exerciseId === id || ex.id === id)).filter(Boolean);
+        }
+        
+        // Si no hay orden guardado, generar uno aleatorio
+        const shuffled = [...exercises];
+        // Fisher-Yates shuffle con seed
+        const random = this.seededRandom(seed ? seed.split('').reduce((a,b)=>a+b.charCodeAt(0),0) : Date.now());
+        for (let i = shuffled.length - 1; i > 0; i--) {
+            const j = Math.floor(random() * (i + 1));
+            [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+        }
+        
+        // Guardar el orden
+        const orderIds = shuffled.map(ex => ex.exerciseId || ex.id);
+        localStorage.setItem(storageKey, JSON.stringify(orderIds));
+        
+        return shuffled;
+    }
+
+    seededRandom(seed) {
+        return function() {
+            seed = (seed * 9301 + 49297) % 233280;
+            return seed / 233280;
+        };
+    }
+
+    // Calcula el número de semana real basado en sessionsPerWeek
+    getWeekNumber(sessionNumber, sessionsPerWeek) {
+        return Math.ceil(sessionNumber / sessionsPerWeek);
+    }
+
+    // Obtiene el tipo de semana (Acumulación, Intensificación, etc.) basado en la semana real
+    getWeekType(weekNumber) {
+        const cyclePosition = ((weekNumber - 1) % 4) + 1;
+        switch(cyclePosition) {
+            case 1: return 'Acumulación';
+            case 2: return 'Intensificación';
+            case 3: return 'Realización';
+            case 4: return 'Descarga';
+            default: return `Semana ${weekNumber}`;
+        }
+    }
+
     // ==================== MESOCICLOS ====================
     renderMesoExercisesList() {
         const searchTerm = document.getElementById('meso-exercise-search').value.toLowerCase();
@@ -503,6 +560,7 @@ class GymTracker {
         const split = document.getElementById('meso-split').value;
         const objective = document.getElementById('meso-objetivo').value;
         const maxExercisesPerSession = parseInt(document.getElementById('meso-max-exercises').value) || 6;
+        const sessionsPerWeek = parseInt(document.getElementById('meso-sessions-per-week').value) || 3;
         
         // Obtener ejercicios seleccionados desde el Set persistente
         const selectedExercises = [];
@@ -532,9 +590,11 @@ class GymTracker {
             split,
             objective,
             maxExercisesPerSession,
+            sessionsPerWeek,
             exercises: selectedExercises,
             createdAt: new Date().toISOString(),
-            completedSessions: 0
+            completedSessions: 0,
+            status: 'active'
         };
 
         this.mesocycles.push(mesocycle);
@@ -582,8 +642,12 @@ class GymTracker {
                 ? `<span style="background: var(--warning-color); color: white; padding: 3px 10px; border-radius: 12px; font-size: 0.8rem;"><i class="fas fa-layer-group"></i> Máx ${meso.maxExercisesPerSession}/sesión</span>`
                 : '';
             
+            const statusBadge = meso.status === 'completed' 
+                ? `<span style="background: var(--success-color); color: white; padding: 3px 10px; border-radius: 12px; font-size: 0.8rem;"><i class="fas fa-check-circle"></i> Completado</span>`
+                : '';
+            
             return `
-            <div class="mesocycle-card" onclick="gymTracker.showMesocycleDetail('${meso.id}')">
+            <div class="mesocycle-card ${meso.status === 'completed' ? 'completed' : ''}" onclick="gymTracker.showMesocycleDetail('${meso.id}')">
                 <h4>${meso.name}</h4>
                 <div class="meso-meta">
                     <span><i class="fas fa-calendar"></i> ${meso.duration} semanas</span>
@@ -597,6 +661,7 @@ class GymTracker {
                         ${objectiveNames[meso.objective] || 'Mixto'}
                     </span>
                     ${maxExText}
+                    ${statusBadge}
                 </div>
                 <p class="meso-description">${meso.description || 'Sin descripción'}</p>
             </div>
@@ -621,21 +686,35 @@ class GymTracker {
         };
 
         const content = document.getElementById('meso-detail-content');
+        const totalSessionsNeeded = meso.duration * (meso.sessionsPerWeek || 3);
+        const isCompleted = meso.status === 'completed' || meso.completedSessions >= totalSessionsNeeded;
+        
         content.innerHTML = `
             <div style="margin-bottom: 20px;">
-                <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+                <div style="display: flex; gap: 10px; margin-bottom: 15px; flex-wrap: wrap;">
                     <span style="background: var(--primary-color); color: white; padding: 5px 12px; border-radius: 15px; font-size: 0.9rem;">
                         ${splitInfo.name}
                     </span>
                     <span style="background: var(--secondary-color); color: white; padding: 5px 12px; border-radius: 15px; font-size: 0.9rem;">
                         ${objectiveNames[meso.objective] || 'Mixto'}
                     </span>
+                    ${isCompleted ? `
+                    <span style="background: var(--success-color); color: white; padding: 5px 12px; border-radius: 15px; font-size: 0.9rem;">
+                        <i class="fas fa-check-circle"></i> Completado
+                    </span>` : ''}
                 </div>
                 <strong>Duración:</strong> ${meso.duration} semanas<br>
                 <strong>Ejercicios:</strong> ${meso.exercises.length}<br>
-                <strong>Sesiones completadas:</strong> ${meso.completedSessions || 0}<br>
-                <strong>Días de entrenamiento:</strong> ${splitInfo.sessions.length > 0 ? splitInfo.sessions.length : 'Variable'}<br>
+                <strong>Sesiones completadas:</strong> ${meso.completedSessions || 0} / ${totalSessionsNeeded}<br>
+                <strong>Sesiones por semana:</strong> ${meso.sessionsPerWeek || 3}<br>
                 <strong>Máx. ejercicios por sesión:</strong> ${meso.maxExercisesPerSession || 'Todos'}<br>
+                ${meso.maxExercisesPerSession && meso.exercises.length > meso.maxExercisesPerSession ? 
+                    `<span style="color: var(--warning-color);"><i class="fas fa-sync-alt"></i> Rotación de ejercicios activada</span>` : ''}
+                ${isCompleted ? 
+                    `<div style="margin-top: 15px; padding: 15px; background: rgba(34, 197, 94, 0.1); border: 1px solid var(--success-color); border-radius: 8px; color: var(--success-color);">
+                        <i class="fas fa-trophy"></i> <strong>¡Mesociclo completado!</strong><br>
+                        <span style="font-size: 0.9rem;">Has completado todas las sesiones programadas. Puedes seguir usando este mesociclo o crear uno nuevo.</span>
+                    </div>` : ''}
                 ${meso.maxExercisesPerSession && meso.exercises.length > meso.maxExercisesPerSession ? 
                     `<span style="color: var(--warning-color);"><i class="fas fa-sync-alt"></i> Rotación de ejercicios activada</span>` : ''}
             </div>
@@ -672,10 +751,14 @@ class GymTracker {
 
     deleteCurrentMesocycle() {
         if (!this.currentMesoDetail) return;
-        
+
         if (confirm('¿Estás seguro de eliminar este mesociclo? Se perderán todos los datos asociados.')) {
             this.mesocycles = this.mesocycles.filter(m => m.id !== this.currentMesoDetail);
             this.sessions = this.sessions.filter(s => s.mesocycleId !== this.currentMesoDetail);
+
+            // Limpiar orden aleatorio guardado para este mesociclo
+            localStorage.removeItem(`gym_meso_order_${this.currentMesoDetail}`);
+
             this.saveToStorage();
             this.renderMesocycles();
             this.updateStats();
@@ -688,9 +771,14 @@ class GymTracker {
     // ==================== SESIONES ====================
     updateMesocycleSelect() {
         const select = document.getElementById('active-mesocycle');
-        select.innerHTML = '<option value="">Seleccionar mesociclo activo...</option>' +
-            this.mesocycles.map(m => `<option value="${m.id}">${m.name}</option>`).join('');
-        
+        select.innerHTML = '<option value="">Seleccionar mesociclo...</option>' +
+            this.mesocycles.map(m => {
+                const totalSessionsNeeded = m.duration * (m.sessionsPerWeek || 3);
+                const isCompleted = m.status === 'completed' || m.completedSessions >= totalSessionsNeeded;
+                const statusText = isCompleted ? ' ✓' : '';
+                return `<option value="${m.id}">${m.name}${statusText}</option>`;
+            }).join('');
+
         // Restaurar sesión si hay una guardada
         const savedSession = localStorage.getItem('gym_current_session');
         if (savedSession) {
@@ -740,7 +828,7 @@ class GymTracker {
             return;
         }
 
-        // Aplicar límite máximo de ejercicios por sesión con rotación
+        // Aplicar límite máximo de ejercicios por sesión con rotación aleatoria semanal
         const maxExercises = meso.maxExercisesPerSession || filteredExercises.length;
         let selectedExercises;
         
@@ -748,20 +836,22 @@ class GymTracker {
             // Si hay menos ejercicios que el máximo, usarlos todos
             selectedExercises = filteredExercises;
         } else {
-            // Rotar ejercicios basado en el número de sesión
-            // Calculamos qué bloque de ejercicios corresponde a esta sesión
-            const totalExercises = filteredExercises.length;
-            const sessionsNeeded = Math.ceil(totalExercises / maxExercises);
-            const sessionIndex = ((sessionNumber - 1) % sessionsNeeded);
+            // Obtener orden aleatorio de ejercicios para todo el mesociclo
+            const mesoOrder = this.getMesocycleExerciseOrder(meso.id, filteredExercises, meso.createdAt);
             
-            const startIndex = sessionIndex * maxExercises;
+            // Calcular qué ejercicios tocan en esta sesión (ciclando por todos los ejercicios)
+            const totalExercises = mesoOrder.length;
+            const sessionsNeeded = Math.ceil(totalExercises / maxExercises);
+            const blockIndex = ((sessionNumber - 1) % sessionsNeeded);
+            
+            const startIndex = blockIndex * maxExercises;
             const endIndex = Math.min(startIndex + maxExercises, totalExercises);
             
-            selectedExercises = filteredExercises.slice(startIndex, endIndex);
+            selectedExercises = mesoOrder.slice(startIndex, endIndex);
             
             // Si llegamos al final y quedan ejercicios sueltos, los mostramos en la siguiente sesión
             if (selectedExercises.length === 0 && totalExercises > 0) {
-                selectedExercises = filteredExercises.slice(0, maxExercises);
+                selectedExercises = mesoOrder.slice(0, maxExercises);
             }
         }
 
@@ -788,8 +878,8 @@ class GymTracker {
         this.renderSession();
         
         const totalInCategory = filteredExercises.length;
-        const showingText = totalInCategory > maxExercises 
-            ? `(${selectedExercises.length} de ${totalInCategory} - rotación)` 
+        const showingText = totalInCategory > maxExercises
+            ? `(${selectedExercises.length} de ${totalInCategory} - orden aleatorio)`
             : `(${selectedExercises.length} ejercicios)`;
         this.showNotification(`Sesión ${sessionNumber}: ${sessionName} ${showingText}`, 'success');
     }
@@ -930,19 +1020,21 @@ class GymTracker {
 
         const sessionNumber = this.currentSession.sessionNumber || 1;
         const sessionName = this.currentSession.sessionName;
-        const weekType = sessionNumber === 1 ? 'Acumulación' :
-                        sessionNumber === 2 ? 'Intensificación' :
-                        sessionNumber === 3 ? 'Realización' :
-                        sessionNumber === 4 ? 'Descarga' : `Semana ${sessionNumber}`;
+        
+        // Obtener mesociclo para calcular la semana correcta
+        const meso = this.mesocycles.find(m => m.id === this.currentSession.mesocycleId);
+        const sessionsPerWeek = meso ? (meso.sessionsPerWeek || 3) : 3;
+        const weekNumber = this.getWeekNumber(sessionNumber, sessionsPerWeek);
+        const weekType = this.getWeekType(weekNumber);
 
         container.innerHTML = `
             <div class="session-info-banner" style="background: linear-gradient(135deg, var(--primary-color), var(--primary-dark)); padding: 15px 20px; border-radius: 8px; margin-bottom: 20px; color: white; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
                 <div>
-                    <strong style="font-size: 1.1rem;">📅 Sesión ${sessionNumber}${sessionName ? ': ' + sessionName : ''}</strong>
+                    <strong style="font-size: 1.1rem;">📅 Semana ${weekNumber} - Sesión ${sessionNumber}${sessionName ? ': ' + sessionName : ''}</strong>
                     <span style="opacity: 0.9; margin-left: 10px;">${weekType}</span>
                 </div>
                 <div style="font-size: 0.9rem; opacity: 0.9;">
-                    Porcentajes: ${this.getProgressivePercentage(sessionNumber, 0)}% → ${this.getProgressivePercentage(sessionNumber, 3)}%
+                    Porcentajes: ${this.getProgressivePercentage(weekNumber, 0)}% → ${this.getProgressivePercentage(weekNumber, 3)}%
                 </div>
             </div>
             <div class="session-exercises">
@@ -1015,70 +1107,67 @@ class GymTracker {
         `;
     }
 
-    getProgressivePercentage(sessionNumber, setIndex, mesocycleDuration = 4) {
+    getProgressivePercentage(weekNumber, setIndex, mesocycleDuration = 4) {
         // Factores de progresión según la semana del mesociclo
-        // Sesión 1: 0.95 (volumen alto, intensidad moderada)
-        // Sesión 2: 1.00 (volumen moderado, intensidad alta)
-        // Sesión 3: 1.05 (intensidad máxima)
-        // Sesión 4: 0.90 (descarga/deload)
-        const sessionMultipliers = {
+        // Semana 1: 0.95 (volumen alto, intensidad moderada)
+        // Semana 2: 1.00 (volumen moderado, intensidad alta)
+        // Semana 3: 1.05 (intensidad máxima)
+        // Semana 4: 0.90 (descarga/deload)
+        const weekMultipliers = {
             1: 0.95,  // Semana 1: Acumulación
             2: 1.00,  // Semana 2: Intensificación
             3: 1.05,  // Semana 3: Realización/Intensidad máxima
             4: 0.90   // Semana 4: Descarga
         };
-        
+
         // Para mesociclos más largos, extender el patrón
-        let sessionMultiplier = sessionMultipliers[sessionNumber] || 1.00;
-        if (sessionNumber > 4) {
-            // Ciclo de 3 semanas: Acumulación -> Intensificación -> Realización
-            const cyclePosition = ((sessionNumber - 1) % 3) + 1;
-            const cycleMultipliers = { 1: 0.95, 2: 1.00, 3: 1.05 };
-            sessionMultiplier = cycleMultipliers[cyclePosition];
-        }
-        
+        const cyclePosition = ((weekNumber - 1) % 4) + 1;
+        let weekMultiplier = weekMultipliers[cyclePosition] || 1.00;
+
         // Escalera ascendente dentro de la sesión
         // Serie 1: 70%, Serie 2: 75%, Serie 3: 80%, Serie 4: 85%
         const setPercentages = [70, 75, 80, 85, 85, 85, 85, 85];
         const basePercentage = setPercentages[Math.min(setIndex, setPercentages.length - 1)];
-        
-        // Aplicar multiplicador de sesión
-        const adjustedPercentage = Math.round(basePercentage * sessionMultiplier);
-        
+
+        // Aplicar multiplicador de semana
+        const adjustedPercentage = Math.round(basePercentage * weekMultiplier);
+
         // Limitar entre 50% y 95%
         return Math.max(50, Math.min(95, adjustedPercentage));
     }
 
     openSetModal(exerciseId, exerciseIndex) {
         this.currentSetExercise = { exerciseId, exerciseIndex };
-        
+
         const exercise = this.currentSession.exercises[exerciseIndex];
         const currentSetsCount = exercise.sets.length;
         const sessionNumber = this.currentSession.sessionNumber || 1;
-        
-        // Obtener porcentaje progresivo basado en sesión y serie
-        const defaultPercentage = this.getProgressivePercentage(sessionNumber, currentSetsCount);
-        
+
+        // Calcular semana real
+        const meso = this.mesocycles.find(m => m.id === this.currentSession.mesocycleId);
+        const sessionsPerWeek = meso ? (meso.sessionsPerWeek || 3) : 3;
+        const weekNumber = this.getWeekNumber(sessionNumber, sessionsPerWeek);
+
+        // Obtener porcentaje progresivo basado en semana y serie
+        const defaultPercentage = this.getProgressivePercentage(weekNumber, currentSetsCount);
+
         // Sugerir reps basadas en el porcentaje
         const suggestedReps = defaultPercentage >= 85 ? 5 : (defaultPercentage >= 80 ? 8 : 10);
-        
+
         document.getElementById('set-percentage').value = defaultPercentage;
         document.getElementById('set-reps').value = suggestedReps;
-        
+
         // Actualizar el título del modal para mostrar qué serie es
         const modalTitle = document.querySelector('#set-modal .modal-header h3');
         modalTitle.textContent = `Configurar Serie ${currentSetsCount + 1}`;
-        
+
         // Actualizar información del esquema
         const schemeInfo = document.getElementById('set-scheme-info');
-        const weekType = sessionNumber === 1 ? 'Acumulación' : 
-                        sessionNumber === 2 ? 'Intensificación' : 
-                        sessionNumber === 3 ? 'Realización' : 
-                        sessionNumber === 4 ? 'Descarga' : `Semana ${sessionNumber}`;
-        
-        schemeInfo.innerHTML = `💡 <strong>${weekType}</strong> - Sesión ${sessionNumber} del mesociclo. `;
+        const weekType = this.getWeekType(weekNumber);
+
+        schemeInfo.innerHTML = `💡 <strong>${weekType}</strong> - Semana ${weekNumber} del mesociclo. `;
         schemeInfo.innerHTML += `Esta serie al ${defaultPercentage}% del 1RM.`;
-        
+
         this.updateCalculatedWeight();
         document.getElementById('set-modal').classList.add('active');
     }
@@ -1178,8 +1267,16 @@ class GymTracker {
         
         // Actualizar contador de sesiones completadas del mesociclo
         const meso = this.mesocycles.find(m => m.id === this.currentSession.mesocycleId);
+        let isMesocycleCompleted = false;
         if (meso) {
             meso.completedSessions = (meso.completedSessions || 0) + 1;
+            
+            // Verificar si el mesociclo se ha completado
+            const totalSessionsNeeded = meso.duration * (meso.sessionsPerWeek || 3);
+            if (meso.completedSessions >= totalSessionsNeeded && meso.status === 'active') {
+                meso.status = 'completed';
+                isMesocycleCompleted = true;
+            }
         }
         
         this.saveToStorage();
@@ -1190,7 +1287,15 @@ class GymTracker {
         
         this.renderSession();
         this.updateStats();
-        this.showNotification('¡Sesión finalizada correctamente!', 'success');
+        
+        if (isMesocycleCompleted) {
+            this.showNotification('🎉 ¡Mesociclo completado! Has terminado todas las sesiones programadas.', 'success');
+            setTimeout(() => {
+                this.showNotification('Puedes seguir usando este mesociclo o crear uno nuevo.', 'info');
+            }, 3500);
+        } else {
+            this.showNotification('¡Sesión finalizada correctamente!', 'success');
+        }
     }
 
     // ==================== ESTADÍSTICAS ====================
@@ -1916,6 +2021,15 @@ function clearAllData() {
             gymTracker.sessions = [];
             gymTracker.currentSession = null;
             localStorage.removeItem('gym_current_session');
+
+            // Limpiar todos los órdenes aleatorios de mesociclos
+            for (let i = localStorage.length - 1; i >= 0; i--) {
+                const key = localStorage.key(i);
+                if (key && key.startsWith('gym_meso_order_')) {
+                    localStorage.removeItem(key);
+                }
+            }
+
             gymTracker.saveToStorage();
             gymTracker.init();
             gymTracker.showNotification('Todos los datos han sido eliminados', 'success');
@@ -2110,10 +2224,14 @@ function generateAutoSets() {
     const numSets = parseInt(document.getElementById('auto-sets-count').value);
     const sessionNumber = gymTracker.currentSession.sessionNumber || 1;
 
+    // Calcular semana real para los porcentajes
+    const meso = gymTracker.mesocycles.find(m => m.id === gymTracker.currentSession.mesocycleId);
+    const sessionsPerWeek = meso ? (meso.sessionsPerWeek || 3) : 3;
+    const weekNumber = gymTracker.getWeekNumber(sessionNumber, sessionsPerWeek);
+
     // Detectar objetivo del mesociclo si está en modo automático
     let targetObjective = objective;
     if (objective === 'auto' && gymTracker.currentSession.mesocycleId) {
-        const meso = gymTracker.mesocycles.find(m => m.id === gymTracker.currentSession.mesocycleId);
         if (meso && meso.objective) {
             targetObjective = meso.objective;
         } else {
@@ -2175,8 +2293,8 @@ function generateAutoSets() {
         // Generar series usando porcentajes progresivos
         ex.sets = [];
         for (let i = 0; i < numSets; i++) {
-            // Usar la función getProgressivePercentage que considera la sesión del mesociclo
-            let setPercentage = gymTracker.getProgressivePercentage(sessionNumber, i);
+            // Usar la función getProgressivePercentage que considera la semana del mesociclo
+            let setPercentage = gymTracker.getProgressivePercentage(weekNumber, i);
             let setReps = baseReps;
 
             // Aplicar ajuste de intensidad al porcentaje
@@ -2240,10 +2358,7 @@ function generateAutoSets() {
         mixed: 'Mixto'
     };
 
-    const weekType = sessionNumber === 1 ? 'Acumulación' :
-                    sessionNumber === 2 ? 'Intensificación' :
-                    sessionNumber === 3 ? 'Realización' :
-                    sessionNumber === 4 ? 'Descarga' : `Semana ${sessionNumber}`;
+    const weekType = gymTracker.getWeekType(weekNumber);
 
     gymTracker.showNotification(`Series generadas: ${objectiveNames[targetObjective]} - ${weekType}`, 'success');
 }
