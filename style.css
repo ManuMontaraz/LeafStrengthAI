@@ -278,6 +278,37 @@ header p {
     color: var(--text-primary);
 }
 
+/* Split info box */
+.split-info {
+    background: var(--bg-color);
+    padding: 15px;
+    border-radius: 8px;
+    margin: 15px 0;
+    border-left: 3px solid var(--primary-color);
+}
+
+.split-info h4 {
+    color: var(--primary-light);
+    margin-bottom: 8px;
+    font-size: 1rem;
+}
+
+.split-info p {
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    line-height: 1.5;
+}
+
+.split-day {
+    display: inline-block;
+    background: var(--card-bg-hover);
+    padding: 4px 10px;
+    border-radius: 4px;
+    margin: 3px;
+    font-size: 0.85rem;
+    color: var(--text-primary);
+}
+
 /* Exercises Grid */
 .exercises-grid {
     display: grid;
@@ -698,7 +729,9 @@ header p {
     display: flex;
     justify-content: center;
     flex: 0 0 auto;
-    min-width: 40px;
+    position: absolute;
+    top: -.5rem;
+    right: -.5rem;
 }
 
 .set-completed input[type="checkbox"] {
@@ -1038,8 +1071,6 @@ header p {
 
     .set-row .set-completed {
         flex: 0 0 auto;
-        min-width: 35px;
-        position: static;
         order: 0;
     }
 

@@ -20,6 +20,7 @@ class GymTracker {
         this.updateMesocycleSelect();
         this.updateStatsExerciseSelect();
         this.renderPersonalRecords();
+        this.updateSplitInfo();
     }
 
     // ==================== UTILIDADES ====================
@@ -72,6 +73,12 @@ class GymTracker {
 
         // Búsqueda de ejercicios en mesociclo
         document.getElementById('meso-exercise-search').addEventListener('input', () => this.renderMesoExercisesList());
+
+        // Filtro por categoría/zona muscular en mesociclo
+        document.getElementById('meso-exercise-filter').addEventListener('change', () => this.renderMesoExercisesList());
+
+        // Cambio de modo de división
+        document.getElementById('meso-split').addEventListener('change', () => this.updateSplitInfo());
 
         // Select de estadísticas
         document.getElementById('stats-exercise-select').addEventListener('change', (e) => {
@@ -288,14 +295,103 @@ class GymTracker {
         document.getElementById('rm-result').classList.remove('hidden');
     }
 
+    // ==================== CONFIGURACIÓN DE MODOS DE DIVISIÓN ====================
+    getSplitConfig() {
+        return {
+            fullbody: {
+                name: 'Full Body',
+                description: 'Trabaja todo el cuerpo en cada sesión. Ideal para principiantes o entrenamiento frecuente.',
+                sessions: [
+                    { name: 'Full Body', categories: ['pecho', 'espalda', 'piernas', 'hombros', 'brazos', 'core'] }
+                ]
+            },
+            'torso-pierna': {
+                name: 'Torso / Pierna',
+                description: 'Alterna entre sesiones de torso (pecho, espalda, hombros, brazos) y piernas.',
+                sessions: [
+                    { name: 'Torso', categories: ['pecho', 'espalda', 'hombros', 'brazos'] },
+                    { name: 'Pierna', categories: ['piernas', 'core'] }
+                ]
+            },
+            'tir-emp-pie': {
+                name: 'Tirón / Empuje / Pierna',
+                description: 'Divide en tres grupos: Tirón (espalda, bíceps), Empuje (pecho, hombros, tríceps), Pierna.',
+                sessions: [
+                    { name: 'Tirón', categories: ['espalda', 'brazos'] },
+                    { name: 'Empuje', categories: ['pecho', 'hombros'] },
+                    { name: 'Pierna', categories: ['piernas', 'core'] }
+                ]
+            },
+            'tir-emp-pie-brazos': {
+                name: 'Tirón / Empuje / Pierna / Brazos',
+                description: 'Añade un día específico para brazos al clásico PPL.',
+                sessions: [
+                    { name: 'Tirón', categories: ['espalda'] },
+                    { name: 'Empuje', categories: ['pecho', 'hombros'] },
+                    { name: 'Pierna', categories: ['piernas', 'core'] },
+                    { name: 'Brazos', categories: ['brazos'] }
+                ]
+            },
+            'weider-5': {
+                name: 'Weider 5 días',
+                description: 'División clásica: Pecho, Espalda, Hombros, Piernas, Brazos.',
+                sessions: [
+                    { name: 'Pecho', categories: ['pecho'] },
+                    { name: 'Espalda', categories: ['espalda'] },
+                    { name: 'Hombros', categories: ['hombros'] },
+                    { name: 'Piernas', categories: ['piernas', 'core'] },
+                    { name: 'Brazos', categories: ['brazos'] }
+                ]
+            },
+            'weider-6': {
+                name: 'Weider 6 días',
+                description: 'División intensiva: Pecho, Espalda, Hombros, Piernas, Brazos, Full Body o Descarga.',
+                sessions: [
+                    { name: 'Pecho', categories: ['pecho'] },
+                    { name: 'Espalda', categories: ['espalda'] },
+                    { name: 'Hombros', categories: ['hombros'] },
+                    { name: 'Piernas', categories: ['piernas'] },
+                    { name: 'Brazos', categories: ['brazos'] },
+                    { name: 'Full Body', categories: ['pecho', 'espalda', 'piernas', 'hombros', 'brazos', 'core'] }
+                ]
+            },
+            'personalizado': {
+                name: 'Personalizado',
+                description: 'Selecciona manualmente los ejercicios para cada sesión.',
+                sessions: []
+            }
+        };
+    }
+
+    getSessionNameForSplit(split, sessionNumber) {
+        const config = this.getSplitConfig()[split];
+        if (!config || config.sessions.length === 0) return `Sesión ${sessionNumber}`;
+        
+        // Ciclar según el número de sesiones configuradas
+        const sessionIndex = (sessionNumber - 1) % config.sessions.length;
+        return config.sessions[sessionIndex].name;
+    }
+
+    getCategoriesForSplit(split, sessionNumber) {
+        const config = this.getSplitConfig()[split];
+        if (!config || config.sessions.length === 0) return null;
+        
+        // Ciclar según el número de sesiones configuradas
+        const sessionIndex = (sessionNumber - 1) % config.sessions.length;
+        return config.sessions[sessionIndex].categories;
+    }
+
     // ==================== MESOCICLOS ====================
     renderMesoExercisesList() {
         const searchTerm = document.getElementById('meso-exercise-search').value.toLowerCase();
+        const categoryFilter = document.getElementById('meso-exercise-filter').value;
         const container = document.getElementById('meso-exercises-list');
         
-        let filtered = this.exercises.filter(ex => 
-            ex.name.toLowerCase().includes(searchTerm)
-        );
+        let filtered = this.exercises.filter(ex => {
+            const matchesSearch = ex.name.toLowerCase().includes(searchTerm);
+            const matchesCategory = categoryFilter === 'all' || ex.category === categoryFilter;
+            return matchesSearch && matchesCategory;
+        });
 
         if (filtered.length === 0) {
             container.innerHTML = '<p class="text-center" style="color: var(--text-secondary); padding: 20px;">No hay ejercicios disponibles</p>';
@@ -304,7 +400,7 @@ class GymTracker {
 
         container.innerHTML = filtered.map(ex => `
             <label class="checkbox-exercise-item">
-                <input type="checkbox" value="${ex.id}" data-name="${ex.name}">
+                <input type="checkbox" value="${ex.id}" data-name="${ex.name}" data-rm="${ex.rm}" data-category="${ex.category}">
                 <div class="exercise-info">
                     <div class="exercise-name">${ex.name}</div>
                     <div class="exercise-rm">1RM: ${ex.rm}kg - ${this.getCategoryName(ex.category)}</div>
@@ -314,19 +410,26 @@ class GymTracker {
     }
 
     showFavoritesForMeso() {
-        const favorites = this.exercises.filter(e => e.favorite);
-        const checkboxes = document.querySelectorAll('#meso-exercises-list input[type="checkbox"]');
+        const categoryFilter = document.getElementById('meso-exercise-filter').value;
         
-        // Mostrar solo favoritos en la lista
+        // Filtrar favoritos respetando el filtro de categoría actual
+        let favorites = this.exercises.filter(e => e.favorite);
+        if (categoryFilter !== 'all') {
+            favorites = favorites.filter(e => e.category === categoryFilter);
+        }
+        
         const container = document.getElementById('meso-exercises-list');
         if (favorites.length === 0) {
-            container.innerHTML = '<p class="text-center" style="color: var(--text-secondary); padding: 20px;">No tienes ejercicios favoritos</p>';
+            const message = categoryFilter === 'all' 
+                ? 'No tienes ejercicios favoritos'
+                : `No tienes ejercicios favoritos en la categoría "${this.getCategoryName(categoryFilter)}"`;
+            container.innerHTML = `<p class="text-center" style="color: var(--text-secondary); padding: 20px;">${message}</p>`;
             return;
         }
 
         container.innerHTML = favorites.map(ex => `
             <label class="checkbox-exercise-item">
-                <input type="checkbox" value="${ex.id}" data-name="${ex.name}" checked>
+                <input type="checkbox" value="${ex.id}" data-name="${ex.name}" data-rm="${ex.rm}" data-category="${ex.category}" checked>
                 <div class="exercise-info">
                     <div class="exercise-name">${ex.name}</div>
                     <div class="exercise-rm">1RM: ${ex.rm}kg - ${this.getCategoryName(ex.category)}</div>
@@ -339,6 +442,8 @@ class GymTracker {
         const name = document.getElementById('meso-name').value.trim();
         const duration = parseInt(document.getElementById('meso-duration').value);
         const description = document.getElementById('meso-description').value.trim();
+        const split = document.getElementById('meso-split').value;
+        const objective = document.getElementById('meso-objetivo').value;
         
         // Obtener ejercicios seleccionados
         const selectedExercises = [];
@@ -349,6 +454,7 @@ class GymTracker {
                     exerciseId: exercise.id,
                     name: exercise.name,
                     rm: exercise.rm,
+                    category: exercise.category,
                     sets: []
                 });
             }
@@ -364,10 +470,11 @@ class GymTracker {
             name,
             duration,
             description,
+            split,
+            objective,
             exercises: selectedExercises,
             createdAt: new Date().toISOString(),
-            completedSessions: 0,
-            objective: 'mixed' // Objetivo por defecto para mesociclos manuales
+            completedSessions: 0
         };
 
         this.mesocycles.push(mesocycle);
@@ -395,16 +502,36 @@ class GymTracker {
             return;
         }
 
-        container.innerHTML = this.mesocycles.map(meso => `
+        const splitConfig = this.getSplitConfig();
+
+        container.innerHTML = this.mesocycles.map(meso => {
+            const splitInfo = splitConfig[meso.split] || { name: 'Personalizado' };
+            const objectiveNames = {
+                strength: 'Fuerza',
+                hypertrophy: 'Hipertrofia',
+                endurance: 'Resistencia',
+                power: 'Potencia',
+                mixed: 'Mixto'
+            };
+            
+            return `
             <div class="mesocycle-card" onclick="gymTracker.showMesocycleDetail('${meso.id}')">
                 <h4>${meso.name}</h4>
                 <div class="meso-meta">
                     <span><i class="fas fa-calendar"></i> ${meso.duration} semanas</span>
                     <span><i class="fas fa-dumbbell"></i> ${meso.exercises.length} ejercicios</span>
                 </div>
+                <div style="margin: 10px 0; display: flex; gap: 8px; flex-wrap: wrap;">
+                    <span style="background: var(--primary-color); color: white; padding: 3px 10px; border-radius: 12px; font-size: 0.8rem;">
+                        ${splitInfo.name}
+                    </span>
+                    <span style="background: var(--secondary-color); color: white; padding: 3px 10px; border-radius: 12px; font-size: 0.8rem;">
+                        ${objectiveNames[meso.objective] || 'Mixto'}
+                    </span>
+                </div>
                 <p class="meso-description">${meso.description || 'Sin descripción'}</p>
             </div>
-        `).join('');
+        `}).join('');
     }
 
     showMesocycleDetail(id) {
@@ -414,17 +541,49 @@ class GymTracker {
         this.currentMesoDetail = id;
         document.getElementById('meso-detail-title').textContent = meso.name;
 
+        const splitConfig = this.getSplitConfig();
+        const splitInfo = splitConfig[meso.split] || { name: 'Personalizado', description: '', sessions: [] };
+        const objectiveNames = {
+            strength: 'Fuerza',
+            hypertrophy: 'Hipertrofia',
+            endurance: 'Resistencia',
+            power: 'Potencia',
+            mixed: 'Mixto'
+        };
+
         const content = document.getElementById('meso-detail-content');
         content.innerHTML = `
             <div style="margin-bottom: 20px;">
+                <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+                    <span style="background: var(--primary-color); color: white; padding: 5px 12px; border-radius: 15px; font-size: 0.9rem;">
+                        ${splitInfo.name}
+                    </span>
+                    <span style="background: var(--secondary-color); color: white; padding: 5px 12px; border-radius: 15px; font-size: 0.9rem;">
+                        ${objectiveNames[meso.objective] || 'Mixto'}
+                    </span>
+                </div>
                 <strong>Duración:</strong> ${meso.duration} semanas<br>
                 <strong>Ejercicios:</strong> ${meso.exercises.length}<br>
-                <strong>Sesiones completadas:</strong> ${meso.completedSessions || 0}
+                <strong>Sesiones completadas:</strong> ${meso.completedSessions || 0}<br>
+                <strong>Días de entrenamiento:</strong> ${splitInfo.sessions.length > 0 ? splitInfo.sessions.length : 'Variable'}
             </div>
+            
+            ${splitInfo.sessions.length > 0 ? `
+            <div class="split-info">
+                <h4><i class="fas fa-layer-group"></i> Estructura de entrenamiento</h4>
+                <p>${splitInfo.description}</p>
+                <div style="margin-top: 10px;">
+                    ${splitInfo.sessions.map((session, idx) => `
+                        <span class="split-day">Día ${idx + 1}: ${session.name}</span>
+                    `).join('')}
+                </div>
+            </div>
+            ` : ''}
+            
             <h4 style="margin-bottom: 15px; color: var(--primary-light);">Ejercicios incluidos:</h4>
             ${meso.exercises.map(ex => `
                 <div class="meso-exercise-detail">
-                    <h5>${ex.name} (1RM: ${ex.rm}kg)</h5>
+                    <h5>${ex.name} (1RM: ${ex.rm}kg) <span style="font-weight: normal; color: var(--text-secondary); font-size: 0.85rem;">- ${this.getCategoryName(ex.category)}</span></h5>
                     ${ex.sets && ex.sets.length > 0 ? `
                         <div class="sets-preview">
                             ${ex.sets.map((set, i) => `
@@ -482,16 +641,47 @@ class GymTracker {
         const sessionsInMesocycle = this.sessions.filter(s => s.mesocycleId === mesoId && s.completed).length;
         const sessionNumber = sessionsInMesocycle + 1;
 
+        // Si el modo es personalizado, mostrar el modal de selección
+        if (meso.split === 'personalizado') {
+            this.pendingSessionMesoId = mesoId;
+            this.renderSessionExercisesList(meso);
+            document.getElementById('session-exercises-modal').classList.add('active');
+            return;
+        }
+
+        // Obtener las categorías que corresponden a esta sesión según el modo
+        const targetCategories = this.getCategoriesForSplit(meso.split, sessionNumber);
+        const sessionName = this.getSessionNameForSplit(meso.split, sessionNumber);
+
+        if (!targetCategories) {
+            this.showNotification('Error al determinar las categorías de la sesión', 'error');
+            return;
+        }
+
+        // Filtrar ejercicios que coincidan con las categorías del día
+        const selectedExercises = meso.exercises.filter(ex => 
+            targetCategories.includes(ex.category)
+        );
+
+        if (selectedExercises.length === 0) {
+            this.showNotification(`No hay ejercicios de ${sessionName} en este mesociclo. Verifica las categorías de los ejercicios.`, 'warning');
+            return;
+        }
+
+        // Crear la sesión con los ejercicios filtrados
         this.currentSession = {
             id: this.generateId(),
             mesocycleId: mesoId,
             mesocycleName: meso.name,
             sessionNumber: sessionNumber,
+            sessionName: sessionName,
+            split: meso.split,
             date: new Date().toISOString(),
-            exercises: meso.exercises.map(ex => ({
+            exercises: selectedExercises.map(ex => ({
                 exerciseId: ex.exerciseId,
                 name: ex.name,
                 rm: ex.rm,
+                category: ex.category,
                 sets: []
             })),
             completed: false
@@ -499,6 +689,110 @@ class GymTracker {
 
         localStorage.setItem('gym_current_session', JSON.stringify(this.currentSession));
         this.renderSession();
+        this.showNotification(`Sesión ${sessionNumber}: ${sessionName} - ${selectedExercises.length} ejercicios`, 'success');
+    }
+
+    renderSessionExercisesList(meso) {
+        const container = document.getElementById('session-exercises-list');
+        const searchTerm = document.getElementById('session-exercise-search').value.toLowerCase();
+        
+        let filteredExercises = meso.exercises;
+        if (searchTerm) {
+            filteredExercises = meso.exercises.filter(ex => 
+                ex.name.toLowerCase().includes(searchTerm)
+            );
+        }
+
+        if (filteredExercises.length === 0) {
+            container.innerHTML = '<p style="color: var(--text-secondary); text-align: center; padding: 20px;">No hay ejercicios disponibles</p>';
+            this.updateSelectedCount();
+            return;
+        }
+
+        container.innerHTML = filteredExercises.map((ex, index) => `
+            <label class="checkbox-exercise-item" style="cursor: pointer;">
+                <input type="checkbox" value="${ex.exerciseId}" data-name="${ex.name}" data-rm="${ex.rm}" 
+                       onchange="gymTracker.updateSelectedCount()" checked
+                       style="width: 20px; height: 20px; margin-right: 12px; accent-color: var(--primary-color);">
+                <div class="exercise-info" style="flex: 1;">
+                    <div class="exercise-name" style="font-weight: 500; color: var(--text-primary);">${ex.name}</div>
+                    <div class="exercise-rm" style="font-size: 0.85rem; color: var(--text-secondary);">1RM: ${ex.rm}kg</div>
+                </div>
+            </label>
+        `).join('');
+
+        this.updateSelectedCount();
+    }
+
+    updateSelectedCount() {
+        const checkboxes = document.querySelectorAll('#session-exercises-list input[type="checkbox"]:checked');
+        document.getElementById('session-selected-count').textContent = checkboxes.length;
+    }
+
+    filterSessionExercises() {
+        const meso = this.mesocycles.find(m => m.id === this.pendingSessionMesoId);
+        if (meso) {
+            this.renderSessionExercisesList(meso);
+        }
+    }
+
+    selectAllSessionExercises() {
+        document.querySelectorAll('#session-exercises-list input[type="checkbox"]').forEach(cb => {
+            cb.checked = true;
+        });
+        this.updateSelectedCount();
+    }
+
+    deselectAllSessionExercises() {
+        document.querySelectorAll('#session-exercises-list input[type="checkbox"]').forEach(cb => {
+            cb.checked = false;
+        });
+        this.updateSelectedCount();
+    }
+
+    confirmSessionExercises() {
+        const selectedCheckboxes = document.querySelectorAll('#session-exercises-list input[type="checkbox"]:checked');
+        
+        if (selectedCheckboxes.length === 0) {
+            this.showNotification('Selecciona al menos un ejercicio', 'warning');
+            return;
+        }
+
+        const mesoId = this.pendingSessionMesoId;
+        const meso = this.mesocycles.find(m => m.id === mesoId);
+        if (!meso) return;
+
+        // Calcular número de sesión dentro del mesociclo (1-based)
+        const sessionsInMesocycle = this.sessions.filter(s => s.mesocycleId === mesoId && s.completed).length;
+        const sessionNumber = sessionsInMesocycle + 1;
+
+        // Obtener el nombre de la sesión según el modo
+        const sessionName = this.getSessionNameForSplit(meso.split, sessionNumber);
+
+        // Crear array de ejercicios seleccionados
+        const selectedExercises = Array.from(selectedCheckboxes).map(cb => ({
+            exerciseId: cb.value,
+            name: cb.dataset.name,
+            rm: parseFloat(cb.dataset.rm),
+            sets: []
+        }));
+
+        this.currentSession = {
+            id: this.generateId(),
+            mesocycleId: mesoId,
+            mesocycleName: meso.name,
+            sessionNumber: sessionNumber,
+            sessionName: sessionName,
+            split: meso.split,
+            date: new Date().toISOString(),
+            exercises: selectedExercises,
+            completed: false
+        };
+
+        localStorage.setItem('gym_current_session', JSON.stringify(this.currentSession));
+        this.closeModal('session-exercises-modal');
+        this.renderSession();
+        this.showNotification(`Sesión ${sessionNumber}${sessionName ? ': ' + sessionName : ''} - ${selectedExercises.length} ejercicios`, 'success');
     }
 
     loadPreviousSession() {
@@ -506,6 +800,13 @@ class GymTracker {
         if (savedSession) {
             this.currentSession = JSON.parse(savedSession);
             document.getElementById('active-mesocycle').value = this.currentSession.mesocycleId;
+            // Si la sesión no tiene sessionName, intentar obtenerlo del modo
+            if (!this.currentSession.sessionName && this.currentSession.split) {
+                this.currentSession.sessionName = this.getSessionNameForSplit(
+                    this.currentSession.split, 
+                    this.currentSession.sessionNumber || 1
+                );
+            }
             this.renderSession();
         } else {
             this.showNotification('No hay sesión anterior guardada', 'warning');
@@ -526,6 +827,7 @@ class GymTracker {
         }
 
         const sessionNumber = this.currentSession.sessionNumber || 1;
+        const sessionName = this.currentSession.sessionName;
         const weekType = sessionNumber === 1 ? 'Acumulación' :
                         sessionNumber === 2 ? 'Intensificación' :
                         sessionNumber === 3 ? 'Realización' :
@@ -534,7 +836,7 @@ class GymTracker {
         container.innerHTML = `
             <div class="session-info-banner" style="background: linear-gradient(135deg, var(--primary-color), var(--primary-dark)); padding: 15px 20px; border-radius: 8px; margin-bottom: 20px; color: white; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
                 <div>
-                    <strong style="font-size: 1.1rem;">📅 Sesión ${sessionNumber}</strong>
+                    <strong style="font-size: 1.1rem;">📅 Sesión ${sessionNumber}${sessionName ? ': ' + sessionName : ''}</strong>
                     <span style="opacity: 0.9; margin-left: 10px;">${weekType}</span>
                 </div>
                 <div style="font-size: 0.9rem; opacity: 0.9;">
@@ -812,6 +1114,34 @@ class GymTracker {
             this.exercises.map(e => `<option value="${e.id}">${e.name}</option>`).join('');
     }
 
+    updateSplitInfo() {
+        const split = document.getElementById('meso-split').value;
+        const container = document.getElementById('split-info-container');
+        const nameEl = document.getElementById('split-info-name');
+        const descEl = document.getElementById('split-info-description');
+        const sessionsEl = document.getElementById('split-info-sessions');
+
+        if (!split || split === 'personalizado') {
+            container.style.display = 'none';
+            return;
+        }
+
+        const config = this.getSplitConfig()[split];
+        if (!config) return;
+
+        container.style.display = 'block';
+        nameEl.textContent = config.name;
+        descEl.textContent = config.description;
+        
+        if (config.sessions.length > 0) {
+            sessionsEl.innerHTML = config.sessions.map((session, idx) => 
+                `<span class="split-day">Día ${idx + 1}: ${session.name}</span>`
+            ).join('');
+        } else {
+            sessionsEl.innerHTML = '';
+        }
+    }
+
     renderExerciseChart(exerciseId) {
         const container = document.getElementById('exercise-chart');
         const detailContainer = document.getElementById('exercise-stats-detail');
@@ -1053,6 +1383,7 @@ class GymTracker {
         const exportData = {
             version: '1.0',
             exportDate: new Date().toISOString(),
+            type: 'complete',
             exercises: this.exercises,
             mesocycles: this.mesocycles,
             sessions: this.sessions
@@ -1070,7 +1401,57 @@ class GymTracker {
         document.body.removeChild(link);
         URL.revokeObjectURL(url);
 
-        this.showNotification('Backup descargado correctamente', 'success');
+        this.showNotification('Backup completo descargado correctamente', 'success');
+    }
+
+    exportExercisesOnly() {
+        const exportData = {
+            version: '1.0',
+            exportDate: new Date().toISOString(),
+            type: 'exercises',
+            exercises: this.exercises,
+            mesocycles: [],
+            sessions: []
+        };
+
+        const dataStr = JSON.stringify(exportData, null, 2);
+        const blob = new Blob([dataStr], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `gym-tracker-ejercicios-${new Date().toISOString().split('T')[0]}.json`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+
+        this.showNotification(`${this.exercises.length} ejercicios exportados correctamente`, 'success');
+    }
+
+    exportMesocyclesOnly() {
+        const exportData = {
+            version: '1.0',
+            exportDate: new Date().toISOString(),
+            type: 'mesocycles',
+            exercises: [],
+            mesocycles: this.mesocycles,
+            sessions: []
+        };
+
+        const dataStr = JSON.stringify(exportData, null, 2);
+        const blob = new Blob([dataStr], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `gym-tracker-mesociclos-${new Date().toISOString().split('T')[0]}.json`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+
+        this.showNotification(`${this.mesocycles.length} mesociclos exportados correctamente`, 'success');
     }
 }
 
@@ -1108,6 +1489,14 @@ function deleteCurrentMesocycle() {
 
 function exportData() {
     gymTracker.exportData();
+}
+
+function exportExercisesOnly() {
+    gymTracker.exportExercisesOnly();
+}
+
+function exportMesocyclesOnly() {
+    gymTracker.exportMesocyclesOnly();
 }
 
 function previewImportFile() {
@@ -1245,6 +1634,33 @@ function clearSessionsOnly() {
     }
 }
 
+function clearMesocyclesOnly() {
+    if (confirm('¿Estás seguro de que quieres borrar todos los mesociclos? Los ejercicios y sesiones completadas se mantendrán.')) {
+        if (confirm('Última advertencia: ¿Realmente quieres eliminar todos los mesociclos?')) {
+            gymTracker.mesocycles = [];
+            gymTracker.saveToStorage();
+            gymTracker.updateStats();
+            gymTracker.updateMesocycleSelect();
+            gymTracker.renderMesocycles();
+            gymTracker.showNotification('Mesociclos eliminados correctamente', 'success');
+        }
+    }
+}
+
+function clearExercisesOnly() {
+    if (confirm('¿Estás seguro de que quieres borrar todos los ejercicios? Los mesociclos y sesiones completadas se mantendrán, pero los ejercicios en ellos quedarán sin referencia.')) {
+        if (confirm('Última advertencia: ¿Realmente quieres eliminar todos los ejercicios?')) {
+            gymTracker.exercises = [];
+            gymTracker.saveToStorage();
+            gymTracker.updateStats();
+            gymTracker.updateStatsExerciseSelect();
+            gymTracker.renderExercises();
+            gymTracker.renderPersonalRecords();
+            gymTracker.showNotification('Ejercicios eliminados correctamente', 'success');
+        }
+    }
+}
+
 // ==================== AUTOMATRÓN ====================
 
 // Configuraciones de objetivos de entrenamiento
@@ -1335,6 +1751,26 @@ function openAutoSetsModal() {
         renderAutoSetsPreview();
     }
     document.getElementById('auto-sets-modal').classList.add('active');
+}
+
+function filterSessionExercises() {
+    gymTracker.filterSessionExercises();
+}
+
+function selectAllSessionExercises() {
+    gymTracker.selectAllSessionExercises();
+}
+
+function deselectAllSessionExercises() {
+    gymTracker.deselectAllSessionExercises();
+}
+
+function confirmSessionExercises() {
+    gymTracker.confirmSessionExercises();
+}
+
+function updateSplitInfo() {
+    gymTracker.updateSplitInfo();
 }
 
 function renderAutoSetsPreview() {

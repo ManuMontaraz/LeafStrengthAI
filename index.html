@@ -158,15 +158,55 @@
                             <input type="number" id="meso-duration" required min="1" max="12" value="4">
                         </div>
                     </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="meso-split">Modo de división</label>
+                            <select id="meso-split" required>
+                                <option value="fullbody">Full Body</option>
+                                <option value="torso-pierna">Torso / Pierna (2 días)</option>
+                                <option value="tir-emp-pie">Tirón / Empuje / Pierna (3 días)</option>
+                                <option value="tir-emp-pie-brazos">Tirón / Empuje / Pierna / Brazos (4 días)</option>
+                                <option value="weider-5">Weider 5 días</option>
+                                <option value="weider-6">Weider 6 días</option>
+                                <option value="personalizado">Personalizado (seleccionar manualmente)</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="meso-objetivo">Objetivo</label>
+                            <select id="meso-objetivo">
+                                <option value="mixed">Mixto</option>
+                                <option value="strength">Fuerza</option>
+                                <option value="hypertrophy">Hipertrofia</option>
+                                <option value="endurance">Resistencia</option>
+                                <option value="power">Potencia</option>
+                            </select>
+                        </div>
+                    </div>
                     <div class="form-group">
                         <label for="meso-description">Descripción</label>
                         <textarea id="meso-description" rows="2" placeholder="Objetivos, notas, etc."></textarea>
                     </div>
                     
+                    <div id="split-info-container" class="split-info" style="display: none;">
+                        <h4><i class="fas fa-info-circle"></i> <span id="split-info-name"></span></h4>
+                        <p id="split-info-description"></p>
+                        <div id="split-info-sessions" style="margin-top: 10px;"></div>
+                    </div>
+
                     <div class="exercises-selection">
                         <h3>Seleccionar Ejercicios</h3>
                         <div class="filter-row">
                             <input type="text" id="meso-exercise-search" placeholder="Buscar ejercicio...">
+                            <select id="meso-exercise-filter">
+                                <option value="all">Todas las zonas</option>
+                                <option value="pecho">Pecho</option>
+                                <option value="espalda">Espalda</option>
+                                <option value="hombros">Hombros</option>
+                                <option value="brazos">Brazos</option>
+                                <option value="piernas">Piernas</option>
+                                <option value="core">Core</option>
+                                <option value="otros">Otros</option>
+                            </select>
                             <button type="button" class="btn btn-small" onclick="showFavoritesForMeso()">
                                 <i class="fas fa-star"></i> Ver Favoritos
                             </button>
@@ -310,9 +350,17 @@
                         </div>
                     </div>
                 </div>
-                <button type="button" onclick="exportData()" class="btn btn-primary" style="width: 100%;">
-                    <i class="fas fa-download"></i> Descargar Backup
-                </button>
+                <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                    <button type="button" onclick="exportData()" class="btn btn-primary" style="flex: 1; min-width: 150px;">
+                        <i class="fas fa-download"></i> Todo
+                    </button>
+                    <button type="button" onclick="exportExercisesOnly()" class="btn btn-secondary" style="flex: 1; min-width: 150px;">
+                        <i class="fas fa-dumbbell"></i> Solo Ejercicios
+                    </button>
+                    <button type="button" onclick="exportMesocyclesOnly()" class="btn btn-secondary" style="flex: 1; min-width: 150px;">
+                        <i class="fas fa-calendar-alt"></i> Solo Mesociclos
+                    </button>
+                </div>
             </div>
 
             <div class="card">
@@ -383,6 +431,12 @@
                     </button>
                     <button type="button" onclick="clearSessionsOnly()" class="btn btn-secondary">
                         <i class="fas fa-history"></i> Solo Sesiones
+                    </button>
+                    <button type="button" onclick="clearMesocyclesOnly()" class="btn btn-secondary">
+                        <i class="fas fa-calendar-alt"></i> Solo Mesociclos
+                    </button>
+                    <button type="button" onclick="clearExercisesOnly()" class="btn btn-secondary">
+                        <i class="fas fa-dumbbell"></i> Solo Ejercicios
                     </button>
                 </div>
             </div>
@@ -505,6 +559,48 @@
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" onclick="closeModal('import-confirm-modal')">Cancelar</button>
                 <button type="button" class="btn btn-primary" onclick="confirmImport()">Confirmar Importación</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal para seleccionar ejercicios de la sesión -->
+    <div id="session-exercises-modal" class="modal modal-large">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3><i class="fas fa-check-square"></i> Seleccionar Ejercicios para la Sesión</h3>
+                <button type="button" class="close-btn" onclick="closeModal('session-exercises-modal')">&times;</button>
+            </div>
+            <div style="padding: 25px; max-height: 60vh; overflow-y: auto;">
+                <p style="color: var(--text-secondary); margin-bottom: 20px;">
+                    Selecciona los ejercicios que vas a realizar en esta sesión. Puedes elegir solo los que necesites para hoy.
+                </p>
+                
+                <div class="filter-row" style="margin-bottom: 20px;">
+                    <input type="text" id="session-exercise-search" placeholder="Buscar ejercicio..." oninput="filterSessionExercises()" style="flex: 2;">
+                    <button type="button" class="btn btn-secondary" onclick="selectAllSessionExercises()">
+                        <i class="fas fa-check-double"></i> Seleccionar todos
+                    </button>
+                    <button type="button" class="btn btn-secondary" onclick="deselectAllSessionExercises()">
+                        <i class="fas fa-times"></i> Deseleccionar todos
+                    </button>
+                </div>
+                
+                <div id="session-exercises-list" class="checkbox-exercises-list" style="max-height: 400px;">
+                    <!-- Se llena dinámicamente -->
+                </div>
+                
+                <div style="margin-top: 20px; padding: 15px; background: var(--bg-color); border-radius: 8px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <span style="color: var(--text-secondary);">Ejercicios seleccionados:</span>
+                        <span id="session-selected-count" style="font-weight: bold; color: var(--primary-light); font-size: 1.2rem;">0</span>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('session-exercises-modal')">Cancelar</button>
+                <button type="button" class="btn btn-primary" onclick="confirmSessionExercises()">
+                    <i class="fas fa-play"></i> Iniciar Sesión
+                </button>
             </div>
         </div>
     </div>
