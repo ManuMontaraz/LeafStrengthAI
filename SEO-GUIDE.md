@@ -20,12 +20,14 @@
 - og:site_name: "LeafStrength by Manu Montaraz"
 
 ### 3. Favicons y PWA ✓
-- Favicon SVG con emoji 🌿
-- Apple touch icon
-- Iconos PNG (16x16, 32x32, 180x180)
+- ✅ Favicon SVG (`icon.svg`) - Icono vectorial principal
+- Apple touch icon PNG (requerido por iOS)
+- Fallbacks PNG 192x192 y 512x512 (compatibilidad)
 - Web App Manifest con datos del autor
 - Theme colors
 - Service Worker
+
+**Nota:** Usamos SVG como icono principal (escalable y optimizado) con PNGs solo como fallback.
 
 ### 4. Archivos de Configuración ✓
 - robots.txt
@@ -56,11 +58,24 @@
 ## Pasos Adicionales Recomendados
 
 ### 1. Imágenes de Previsualización
-Crear y subir:
-- `og-image.png` (1200x630px) - Para compartir en redes
-- `screenshot-wide.png` (1280x720px) - Para PWA
-- `screenshot-narrow.png` (750x1334px) - Para PWA móvil
-- Iconos PNG: `icon-72x72.png` hasta `icon-512x512.png`
+**Mínimo necesario (7 archivos):**
+
+**Iconos (5 archivos):**
+- ✅ `icon.svg` - Icono principal en formato vectorial (ya creado)
+- `icon-192.png` (192x192) - Fallback PNG para navegadores antiguos
+- `icon-512.png` (512x512) - Fallback PNG para instalación PWA
+- `apple-touch-icon.png` (180x180) - Requerido por iOS
+- `favicon.ico` - Fallback para navegadores muy antiguos
+- `mstile-150x150.png` (150x150) - Para IE/Edge en Windows
+
+**Para compartir (1 archivo):**
+- `og-image.png` (1200x630px) - Imagen al compartir en redes sociales
+
+**Capturas PWA opcionales (2 archivos):**
+- `screenshot-wide.png` (1280x720px) - Para stores/desktop
+- `screenshot-narrow.png` (750x1334px) - Para stores/móvil
+
+**Nota:** El SVG (`icon.svg`) se usa como icono y favicon principal. Los demás archivos son fallbacks para máxima compatibilidad (IE/Edge, iOS, navegadores antiguos).
 
 ### 2. Google Search Console
 1. Ve a https://search.google.com/search-console

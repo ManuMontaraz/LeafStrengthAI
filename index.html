@@ -34,15 +34,15 @@
     <meta property="twitter:image" content="https://leafstrength.app/og-image.png">
     
     <!-- Favicon -->
-    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌿</text></svg>">
+    <link rel="icon" type="image/svg+xml" href="/icon.svg">
+    <link rel="alternate icon" href="/favicon.ico">
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
-    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
-    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
     <link rel="manifest" href="/site.webmanifest">
     
     <!-- Theme Color -->
-    <meta name="theme-color" content="#6366f1">
-    <meta name="msapplication-TileColor" content="#6366f1">
+    <meta name="theme-color" content="#059669">
+    <meta name="msapplication-TileColor" content="#059669">
+    <meta name="msapplication-config" content="/browserconfig.xml">
     
     <!-- Preconnect to external domains -->
     <link rel="preconnect" href="https://cdnjs.cloudflare.com">
@@ -352,7 +352,7 @@
                     <button type="button" class="btn btn-secondary" onclick="loadPreviousSession()">
                         <i class="fas fa-history"></i> Sesión anterior
                     </button>
-                    <button type="button" class="btn btn-auto" onclick="openAutoSetsModal()" style="background: linear-gradient(135deg, #6366f1, #8b5cf6); color: white;">
+                    <button type="button" class="btn btn-auto" onclick="openAutoSetsModal()" style="background: linear-gradient(135deg, #059669, #10b981); color: white;">
                         <i class="fas fa-robot"></i> Modo Auto
                     </button>
                     <button type="button" class="btn btn-primary" onclick="startNewSession()">
@@ -499,7 +499,7 @@
 
                 <div id="import-preview" class="hidden" style="margin: 20px 0; padding: 20px; background: var(--bg-color); border-radius: 8px;">
                     <h4 style="margin-bottom: 15px; color: var(--primary-light);">Vista previa del archivo</h4>
-                    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-bottom: 15px;">
+                    <div style="display: flex;gap: 15px;margin-bottom: 15px;flex-wrap: wrap;justify-content: center;">
                         <div style="text-align: center; padding: 15px; background: var(--card-bg); border-radius: 8px;">
                             <div style="font-size: 1.5rem; font-weight: bold; color: var(--primary-light);" id="preview-exercises">0</div>
                             <div style="color: var(--text-secondary); font-size: 0.9rem;">Ejercicios</div>
@@ -785,7 +785,7 @@
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" onclick="closeModal('auto-sets-modal')">Cancelar</button>
-                <button type="button" class="btn btn-primary" onclick="generateAutoSets()" style="background: linear-gradient(135deg, #6366f1, #8b5cf6);">
+                <button type="button" class="btn btn-primary" onclick="generateAutoSets()" style="background: linear-gradient(135deg, #059669, #10b981);">
                     <i class="fas fa-magic"></i> Generar Series
                 </button>
             </div>

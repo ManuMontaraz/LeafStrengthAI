@@ -1296,8 +1296,8 @@ class GymTracker {
                 datasets: [{
                     label: 'Peso (kg)',
                     data: exerciseData.map(d => d.weight),
-                    borderColor: '#6366f1',
-                    backgroundColor: 'rgba(99, 102, 241, 0.1)',
+                    borderColor: '#059669',
+                    backgroundColor: 'rgba(5, 150, 105, 0.1)',
                     tension: 0.4,
                     fill: true
                 }, {
@@ -1637,7 +1637,7 @@ class GymTracker {
             success: '#22c55e',
             warning: '#f59e0b',
             error: '#ef4444',
-            info: '#6366f1'
+            info: '#059669'
         };
 
         const notification = document.createElement('div');
