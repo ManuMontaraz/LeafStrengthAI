@@ -953,11 +953,6 @@ class GymTracker {
                                 <h4>${ex.name}</h4>
                                 <div class="exercise-rm">1RM: ${ex.rm}kg</div>
                             </div>
-                            <div class="session-exercise-actions">
-                                <button type="button" class="btn btn-secondary btn-small" onclick="gymTracker.openSetModal('${ex.exerciseId}', ${exIndex})">
-                                    <i class="fas fa-plus"></i> Añadir serie
-                                </button>
-                            </div>
                         </div>
                         <div class="sets-container">
                             ${ex.sets.length > 0 ? ex.sets.map((set, setIndex) => `
