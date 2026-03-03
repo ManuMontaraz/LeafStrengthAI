@@ -126,6 +126,8 @@ class GymTracker {
             this.updateStats();
             this.updateStatsExerciseSelect();
             this.renderPersonalRecords();
+            this.updateSessionHistoryFilters();
+            this.renderSessionsHistory();
         } else if (tabId === 'backup') {
             this.updateBackupStats();
         }
@@ -1334,6 +1336,197 @@ class GymTracker {
         `).join('');
     }
 
+    // ==================== HISTORIAL DE SESIONES ====================
+    renderSessionsHistory() {
+        const container = document.getElementById('sessions-history-list');
+        const mesocycleFilter = document.getElementById('session-filter-mesocycle').value;
+        const sortOrder = document.getElementById('session-filter-sort').value;
+        
+        let filteredSessions = [...this.sessions];
+        
+        // Filtrar por mesociclo
+        if (mesocycleFilter !== 'all') {
+            filteredSessions = filteredSessions.filter(s => s.mesocycleId === mesocycleFilter);
+        }
+        
+        // Ordenar
+        filteredSessions.sort((a, b) => {
+            const dateA = new Date(a.date);
+            const dateB = new Date(b.date);
+            return sortOrder === 'newest' ? dateB - dateA : dateA - dateB;
+        });
+        
+        if (filteredSessions.length === 0) {
+            container.innerHTML = `
+                <div class="empty-state" style="padding: 40px;">
+                    <i class="fas fa-calendar-times" style="font-size: 3rem; margin-bottom: 15px;"></i>
+                    <p>No hay sesiones completadas todavía</p>
+                    <p style="font-size: 0.9rem; margin-top: 10px;">¡Completa tu primera sesión para ver tu historial!</p>
+                </div>
+            `;
+            return;
+        }
+        
+        container.innerHTML = filteredSessions.map(session => {
+            const date = new Date(session.date);
+            const formattedDate = date.toLocaleDateString('es-ES', { 
+                weekday: 'long', 
+                year: 'numeric', 
+                month: 'long', 
+                day: 'numeric' 
+            });
+            const formattedTime = date.toLocaleTimeString('es-ES', { 
+                hour: '2-digit', 
+                minute: '2-digit' 
+            });
+            
+            const totalSets = session.exercises.reduce((sum, ex) => sum + ex.sets.length, 0);
+            const completedSets = session.exercises.reduce((sum, ex) => 
+                sum + ex.sets.filter(s => s.completed).length, 0
+            );
+            
+            return `
+                <div class="session-history-item" onclick="gymTracker.showSessionDetail('${session.id}')">
+                    <div class="session-history-header">
+                        <div class="session-history-title">
+                            <i class="fas fa-dumbbell" style="color: var(--primary-color); margin-right: 8px;"></i>
+                            ${session.mesocycleName} - Sesión ${session.sessionNumber}
+                            ${session.sessionName ? `<span style="color: var(--text-secondary); font-weight: normal;">(${session.sessionName})</span>` : ''}
+                        </div>
+                        <div class="session-history-date">
+                            <i class="fas fa-calendar"></i>
+                            ${formattedDate} a las ${formattedTime}
+                        </div>
+                    </div>
+                    <div class="session-history-meta">
+                        <span><i class="fas fa-dumbbell"></i> ${session.exercises.length} ejercicios</span>
+                        <span><i class="fas fa-layer-group"></i> ${totalSets} series</span>
+                        <span><i class="fas fa-check-circle"></i> ${completedSets} completadas</span>
+                    </div>
+                    <div class="session-history-exercises">
+                        ${session.exercises.slice(0, 4).map(ex => `
+                            <div class="session-history-exercise">${ex.name}</div>
+                        `).join('')}
+                        ${session.exercises.length > 4 ? `
+                            <div class="session-history-exercise" style="background: var(--primary-color); color: white;">
+                                +${session.exercises.length - 4} más
+                            </div>
+                        ` : ''}
+                    </div>
+                </div>
+            `;
+        }).join('');
+    }
+    
+    updateSessionHistoryFilters() {
+        const select = document.getElementById('session-filter-mesocycle');
+        const currentValue = select.value;
+        
+        select.innerHTML = '<option value="all">Todos los mesociclos</option>' +
+            this.mesocycles.map(m => `<option value="${m.id}">${m.name}</option>`).join('');
+        
+        // Restaurar valor seleccionado si aún existe
+        if (currentValue !== 'all' && this.mesocycles.find(m => m.id === currentValue)) {
+            select.value = currentValue;
+        }
+    }
+    
+    showSessionDetail(sessionId) {
+        const session = this.sessions.find(s => s.id === sessionId);
+        if (!session) return;
+        
+        const modal = document.getElementById('session-detail-modal');
+        const content = document.getElementById('session-detail-content');
+        
+        const date = new Date(session.date);
+        const formattedDate = date.toLocaleDateString('es-ES', { 
+            weekday: 'long', 
+            year: 'numeric', 
+            month: 'long', 
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+        
+        const totalVolume = session.exercises.reduce((total, ex) => {
+            return total + ex.sets.reduce((exTotal, set) => {
+                if (set.completed && set.weight && set.actualReps) {
+                    return exTotal + (set.weight * set.actualReps);
+                }
+                return exTotal;
+            }, 0);
+        }, 0);
+        
+        content.innerHTML = `
+            <div style="background: var(--bg-color); padding: 20px; border-radius: 10px; margin-bottom: 20px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; flex-wrap: wrap; gap: 10px;">
+                    <h3 style="color: var(--primary-light); margin: 0;">
+                        <i class="fas fa-dumbbell"></i> ${session.mesocycleName}
+                    </h3>
+                    <span style="background: var(--primary-color); color: white; padding: 5px 12px; border-radius: 15px; font-size: 0.9rem;">
+                        Sesión ${session.sessionNumber}${session.sessionName ? ': ' + session.sessionName : ''}
+                    </span>
+                </div>
+                <div style="color: var(--text-secondary); margin-bottom: 10px;">
+                    <i class="fas fa-calendar"></i> ${formattedDate}
+                </div>
+                <div style="display: flex; gap: 15px; flex-wrap: wrap; color: var(--text-secondary);">
+                    <span><i class="fas fa-dumbbell"></i> ${session.exercises.length} ejercicios</span>
+                    <span><i class="fas fa-fire"></i> ${totalVolume.toLocaleString()} kg de volumen</span>
+                </div>
+            </div>
+            
+            <h4 style="color: var(--text-primary); margin-bottom: 15px;">Ejercicios realizados</h4>
+            
+            ${session.exercises.map(ex => {
+                const completedSets = ex.sets.filter(s => s.completed).length;
+                const exerciseVolume = ex.sets.reduce((sum, set) => {
+                    if (set.completed && set.weight && set.actualReps) {
+                        return sum + (set.weight * set.actualReps);
+                    }
+                    return sum;
+                }, 0);
+                
+                return `
+                    <div class="exercise-detail">
+                        <h4>
+                            ${ex.name}
+                            <span style="color: var(--text-secondary); font-weight: normal; font-size: 0.9rem;">
+                                (1RM: ${ex.rm}kg)
+                            </span>
+                        </h4>
+                        <div style="display: flex; gap: 10px; margin-bottom: 10px; flex-wrap: wrap;">
+                            <span style="background: var(--card-bg-hover); padding: 3px 10px; border-radius: 12px; font-size: 0.85rem; color: var(--text-secondary);">
+                                ${ex.sets.length} series
+                            </span>
+                            <span style="background: var(--success-color); color: white; padding: 3px 10px; border-radius: 12px; font-size: 0.85rem;">
+                                ${completedSets} completadas
+                            </span>
+                            ${exerciseVolume > 0 ? `
+                                <span style="background: var(--warning-color); color: white; padding: 3px 10px; border-radius: 12px; font-size: 0.85rem;">
+                                    ${exerciseVolume.toLocaleString()} kg volumen
+                                </span>
+                            ` : ''}
+                        </div>
+                        <div class="sets-detail">
+                            ${ex.sets.map((set, idx) => `
+                                <div class="set-detail-item ${set.completed ? 'completed' : ''}">
+                                    <div style="font-weight: 600; color: var(--text-primary);">Serie ${idx + 1}</div>
+                                    <div style="color: var(--text-secondary); font-size: 0.85rem; margin-top: 5px;">
+                                        ${set.weight ? set.weight + ' kg' : '-'} × ${set.actualReps || set.targetReps || '-'} reps
+                                    </div>
+                                    ${set.rpe ? `<div style="color: var(--primary-light); font-size: 0.8rem; margin-top: 3px;">RPE ${set.rpe}</div>` : ''}
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                `;
+            }).join('')}
+        `;
+        
+        modal.classList.add('active');
+    }
+
     // ==================== UTILIDADES UI ====================
     closeModal(modalId) {
         document.getElementById(modalId).classList.remove('active');
@@ -1497,6 +1690,10 @@ function exportExercisesOnly() {
 
 function exportMesocyclesOnly() {
     gymTracker.exportMesocyclesOnly();
+}
+
+function filterSessionHistory() {
+    gymTracker.renderSessionsHistory();
 }
 
 function previewImportFile() {

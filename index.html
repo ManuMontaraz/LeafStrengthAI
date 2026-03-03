@@ -303,6 +303,22 @@
             </div>
 
             <div class="card">
+                <h2><i class="fas fa-history"></i> Historial de Sesiones</h2>
+                <div class="filter-row" style="margin-bottom: 20px;">
+                    <select id="session-filter-mesocycle" onchange="filterSessionHistory()">
+                        <option value="all">Todos los mesociclos</option>
+                    </select>
+                    <select id="session-filter-sort" onchange="filterSessionHistory()">
+                        <option value="newest">Más recientes primero</option>
+                        <option value="oldest">Más antiguas primero</option>
+                    </select>
+                </div>
+                <div id="sessions-history-list" class="sessions-history-list">
+                    <!-- Lista de sesiones pasadas -->
+                </div>
+            </div>
+
+            <div class="card">
                 <h2><i class="fas fa-trophy"></i> Records Personales</h2>
                 <div id="personal-records" class="records-list">
                     <!-- Records personales -->
@@ -665,6 +681,22 @@
                 <button type="button" class="btn btn-primary" onclick="generateAutoSets()" style="background: linear-gradient(135deg, #6366f1, #8b5cf6);">
                     <i class="fas fa-magic"></i> Generar Series
                 </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal para ver detalle de sesión pasada -->
+    <div id="session-detail-modal" class="modal modal-large session-detail-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3><i class="fas fa-clipboard-list"></i> Detalle de Sesión</h3>
+                <button type="button" class="close-btn" onclick="closeModal('session-detail-modal')">&times;</button>
+            </div>
+            <div id="session-detail-content" style="padding: 25px; max-height: 70vh; overflow-y: auto;">
+                <!-- Contenido dinámico -->
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('session-detail-modal')">Cerrar</button>
             </div>
         </div>
     </div>
