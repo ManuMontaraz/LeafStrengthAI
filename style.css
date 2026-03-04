@@ -220,6 +220,7 @@ header p {
     align-items: center;
     gap: 8px;
     font-weight: 500;
+    width: 100%;
 }
 
 .btn-primary {
@@ -1147,8 +1148,6 @@ header p {
         flex-direction: column;
         align-items: flex-start;
         gap: 10px;
-        position: sticky;
-        top: 0px;
         z-index: 1;
     }
     
@@ -1199,6 +1198,27 @@ header p {
     }
     
     /* Layout en 1 columna para móvil pequeño */
+    .session-exercise-header {
+        position: sticky;
+        left: 0px;
+    }
+
+    .sets-container {
+        display:inline-grid;
+        gap:1rem;
+    }
+
+    .set-row {
+        grid-row:1;
+        min-width: 16rem;
+    }
+
+    .add-set-btn{
+        position:sticky;
+        left: calc(50% - 8rem - 1px);
+        min-width: 100%;
+    }
+    
     .set-row {
         flex-direction: column;
         align-items: stretch;
@@ -1328,7 +1348,7 @@ header p {
 
 .session-history-header {
     display: flex;
-    justify-content: space-between;
+    justify-content: center;
     align-items: center;
     margin-bottom: 12px;
     flex-wrap: wrap;
@@ -1354,6 +1374,7 @@ header p {
     gap: 15px;
     flex-wrap: wrap;
     margin-bottom: 12px;
+    justify-content: center;
 }
 
 .session-history-meta span {
@@ -1371,6 +1392,7 @@ header p {
     display: flex;
     flex-wrap: wrap;
     gap: 8px;
+    justify-content: space-evenly;
 }
 
 .session-history-exercise {
