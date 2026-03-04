@@ -1117,7 +1117,7 @@ class GymTracker {
                         <div class="sets-container">
                             ${ex.sets.length > 0 ? ex.sets.map((set, setIndex) => `
                                 <div class="set-row">
-                                    <div class="set-number">${setIndex + 1}</div>
+                                    <div class="set-number">${setIndex + 1}${set.note ? ` <span style="font-size: 0.7rem; color: var(--primary-light); display: block;">${set.note}</span>` : ''}</div>
                                     <div class="set-field">
                                         <label>Peso (kg)</label>
                                         <input type="number" value="${set.weight || ''}" 
@@ -1295,6 +1295,10 @@ class GymTracker {
     }
 
     removeSet(exerciseId, setIndex) {
+        if (!confirm('¿Estás seguro de que quieres eliminar esta serie?')) {
+            return;
+        }
+        
         const exercise = this.currentSession.exercises.find(e => e.exerciseId === exerciseId);
         if (exercise) {
             exercise.sets.splice(setIndex, 1);
@@ -2331,7 +2335,8 @@ function generateAutoSets() {
         mixed: { reps: 8, rpeTarget: 8 }
     };
 
-    const config = baseConfigs[targetObjective];
+    // Para test1rm no usamos baseConfigs, tiene su propia lógica
+    const config = targetObjective === 'test1rm' ? null : baseConfigs[targetObjective];
 
     // Ajustar por intensidad seleccionada
     const intensityMultipliers = {
@@ -2349,8 +2354,6 @@ function generateAutoSets() {
                 .flatMap(e => e.sets.filter(set => set.completed && set.weight > 0)
                     .map(set => ({ weight: set.weight, reps: set.targetReps })))
         );
-
-        let baseReps = Math.round(config.reps * mult.reps);
 
         // Calcular peso base de referencia (última serie/working set) sin ajuste de progresión de sesión
         let referenceWeight = Math.round(ex.rm * (85 / 100) * mult.percentage);
@@ -2372,53 +2375,127 @@ function generateAutoSets() {
 
         // Generar series usando porcentajes progresivos
         ex.sets = [];
-        for (let i = 0; i < numSets; i++) {
-            // Usar la función getProgressivePercentage que considera la semana del mesociclo
-            let setPercentage = gymTracker.getProgressivePercentage(weekNumber, i);
-            let setReps = baseReps;
-
-            // Aplicar ajuste de intensidad al porcentaje
-            setPercentage = Math.round(setPercentage * mult.percentage);
-            setPercentage = Math.max(50, Math.min(95, setPercentage));
-
-            // Calcular peso
-            let setWeight = Math.round(ex.rm * (setPercentage / 100));
-
-            // Ajustar según el objetivo
-            if (targetObjective === 'strength' || targetObjective === 'power') {
-                // Para fuerza/potencia: menos reps en series más pesadas
-                if (setPercentage >= 85) {
-                    setReps = Math.max(1, baseReps - 2);
-                } else if (setPercentage >= 80) {
-                    setReps = Math.max(3, baseReps - 1);
+        
+        // CASO ESPECIAL: Test de 1RM
+        if (targetObjective === 'test1rm') {
+            // Configuración dinámica según número de series solicitadas
+            // Ajustar porcentajes según intensidad seleccionada
+            const intensityAdjustment = {
+                conservative: -2.5,
+                moderate: 0,
+                aggressive: 2.5
+            };
+            const adjustment = intensityAdjustment[intensity] || 0;
+            
+            // Construir series dinámicamente según numSets
+            let testSets = [];
+            
+            // Calcular porcentaje del 1RM según intensidad (para superar el actual)
+            const targetRMPercentage = {
+                conservative: 102,
+                moderate: 105,
+                aggressive: 108
+            }[intensity] || 105;
+            
+            if (numSets === 3) {
+                // Mínimo: Calentamiento + Aproximación + 1RM
+                testSets = [
+                    { percentage: 60, reps: 10, note: 'Calentamiento' },
+                    { percentage: 85, reps: 3, note: 'Aproximación' },
+                    { percentage: targetRMPercentage, reps: 1, note: `¡1RM! (${targetRMPercentage}%)` }
+                ];
+            } else if (numSets === 4) {
+                // Calentamiento + 2 Aproximaciones + 1RM
+                testSets = [
+                    { percentage: 60, reps: 10, note: 'Calentamiento' },
+                    { percentage: 80, reps: 3, note: 'Aproximación' },
+                    { percentage: 90, reps: 1, note: 'Aproximación' },
+                    { percentage: targetRMPercentage, reps: 1, note: `¡1RM! (${targetRMPercentage}%)` }
+                ];
+            } else {
+                // 5+ series: Calentamiento + 3 Aproximaciones + 1RM + Backoffs
+                testSets = [
+                    { percentage: 60, reps: 10, note: 'Calentamiento' },
+                    { percentage: 75, reps: 5, note: 'Aproximación' },
+                    { percentage: 85, reps: 3, note: 'Aproximación' },
+                    { percentage: 93, reps: 1, note: 'Aproximación' },
+                    { percentage: targetRMPercentage, reps: 1, note: `¡1RM! (${targetRMPercentage}%)` }
+                ];
+                
+                // Añadir backoffs para series adicionales
+                for (let i = 5; i < numSets; i++) {
+                    testSets.push({ percentage: 75, reps: 5, note: 'Backoff' });
                 }
-            } else if (targetObjective === 'hypertrophy') {
-                // Para hipertrofia: más reps en series más ligeras
-                if (setPercentage <= 75) {
-                    setReps = baseReps + 2;
-                }
-            } else if (targetObjective === 'endurance') {
-                // Para resistencia: más reps en series ligeras
-                if (setPercentage <= 75) {
-                    setReps = baseReps + 5;
-                }
-            } else if (targetObjective === 'deload') {
-                // Para descarga: porcentajes más bajos
-                setPercentage = Math.max(50, setPercentage - 20);
             }
             
-            // Ajustar para que la última serie coincida con el peso de trabajo calculado
-            if (i === numSets - 1) {
-                setWeight = referenceWeight;
-            }
-            
-            ex.sets.push({
-                targetReps: setReps,
-                suggestedWeight: setWeight,
-                percentage: setPercentage,
-                weight: setWeight,
-                completed: false
+            testSets.forEach((testSet, idx) => {
+                let adjustedPercentage = Math.round(testSet.percentage + adjustment);
+                // Permitir hasta 110% para el test de 1RM
+                adjustedPercentage = Math.max(50, Math.min(110, adjustedPercentage));
+                
+                let setWeight = Math.round(ex.rm * (adjustedPercentage / 100));
+                
+                ex.sets.push({
+                    targetReps: testSet.reps,
+                    suggestedWeight: setWeight,
+                    percentage: adjustedPercentage,
+                    weight: setWeight,
+                    completed: false,
+                    note: testSet.note
+                });
             });
+        } else {
+            // Generación normal de series para otros objetivos
+            let baseReps = Math.round(config.reps * mult.reps);
+            
+            for (let i = 0; i < numSets; i++) {
+                // Usar la función getProgressivePercentage que considera la semana del mesociclo
+                let setPercentage = gymTracker.getProgressivePercentage(weekNumber, i);
+                let setReps = baseReps;
+
+                // Aplicar ajuste de intensidad al porcentaje
+                setPercentage = Math.round(setPercentage * mult.percentage);
+                setPercentage = Math.max(50, Math.min(95, setPercentage));
+
+                // Calcular peso
+                let setWeight = Math.round(ex.rm * (setPercentage / 100));
+
+                // Ajustar según el objetivo
+                if (targetObjective === 'strength' || targetObjective === 'power') {
+                    // Para fuerza/potencia: menos reps en series más pesadas
+                    if (setPercentage >= 85) {
+                        setReps = Math.max(1, baseReps - 2);
+                    } else if (setPercentage >= 80) {
+                        setReps = Math.max(3, baseReps - 1);
+                    }
+                } else if (targetObjective === 'hypertrophy') {
+                    // Para hipertrofia: más reps en series más ligeras
+                    if (setPercentage <= 75) {
+                        setReps = baseReps + 2;
+                    }
+                } else if (targetObjective === 'endurance') {
+                    // Para resistencia: más reps en series ligeras
+                    if (setPercentage <= 75) {
+                        setReps = baseReps + 5;
+                    }
+                } else if (targetObjective === 'deload') {
+                    // Para descarga: porcentajes más bajos
+                    setPercentage = Math.max(50, setPercentage - 20);
+                }
+                
+                // Ajustar para que la última serie coincida con el peso de trabajo calculado
+                if (i === numSets - 1) {
+                    setWeight = referenceWeight;
+                }
+                
+                ex.sets.push({
+                    targetReps: setReps,
+                    suggestedWeight: setWeight,
+                    percentage: setPercentage,
+                    weight: setWeight,
+                    completed: false
+                });
+            }
         }
     });
     
@@ -2433,7 +2510,8 @@ function generateAutoSets() {
         endurance: 'Resistencia',
         power: 'Potencia',
         deload: 'Descarga',
-        mixed: 'Mixto'
+        mixed: 'Mixto',
+        test1rm: 'Test 1RM'
     };
 
     const weekType = gymTracker.getWeekType(weekNumber);
