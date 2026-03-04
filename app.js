@@ -475,7 +475,26 @@ class GymTracker {
         if (savedOrder) {
             const order = JSON.parse(savedOrder);
             // Reconstruir el array de ejercicios en el orden guardado
-            return order.map(id => exercises.find(ex => ex.exerciseId === id || ex.id === id)).filter(Boolean);
+            const orderedExercises = order.map(id => exercises.find(ex => ex.exerciseId === id || ex.id === id)).filter(Boolean);
+            
+            // Añadir ejercicios nuevos que no estaban en el orden guardado
+            const orderedIds = new Set(order);
+            const newExercises = exercises.filter(ex => !orderedIds.has(ex.exerciseId) && !orderedIds.has(ex.id));
+            
+            if (newExercises.length > 0) {
+                // Mezclar los nuevos ejercicios aleatoriamente
+                const random = this.seededRandom(Date.now());
+                for (let i = newExercises.length - 1; i > 0; i--) {
+                    const j = Math.floor(random() * (i + 1));
+                    [newExercises[i], newExercises[j]] = [newExercises[j], newExercises[i]];
+                }
+                // Añadir al final y actualizar el orden guardado
+                orderedExercises.push(...newExercises);
+                const updatedOrderIds = orderedExercises.map(ex => ex.exerciseId || ex.id);
+                localStorage.setItem(storageKey, JSON.stringify(updatedOrderIds));
+            }
+            
+            return orderedExercises;
         }
         
         // Si no hay orden guardado, generar uno aleatorio
