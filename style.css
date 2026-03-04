@@ -1486,6 +1486,7 @@ header p {
     background: var(--bg-color);
     border: 1px solid var(--border-color);
     border-radius: 8px;
+    justify-content: center;
 }
 
 .checkbox-inline {
