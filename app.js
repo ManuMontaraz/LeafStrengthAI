@@ -132,6 +132,11 @@ class GymTracker {
             this.renderMesoExercisesList();
         } else if (tabId === 'session') {
             this.updateMesocycleSelect();
+            // Cargar sesión anterior automáticamente si existe
+            const savedSession = localStorage.getItem('gym_current_session');
+            if (savedSession) {
+                this.loadPreviousSession();
+            }
         } else if (tabId === 'stats') {
             this.updateStats();
             this.updateStatsExerciseSelect();
@@ -258,10 +263,62 @@ class GymTracker {
         const exercise = this.exercises.find(e => e.id === id);
         
         if (exercise) {
-            exercise.name = document.getElementById('edit-exercise-name').value.trim();
-            exercise.category = document.getElementById('edit-exercise-category').value;
-            exercise.rm = parseFloat(document.getElementById('edit-exercise-rm').value);
-            exercise.favorite = document.getElementById('edit-exercise-favorite').checked;
+            const newName = document.getElementById('edit-exercise-name').value.trim();
+            const newCategory = document.getElementById('edit-exercise-category').value;
+            const newRM = parseFloat(document.getElementById('edit-exercise-rm').value);
+            const newFavorite = document.getElementById('edit-exercise-favorite').checked;
+            
+            exercise.name = newName;
+            exercise.category = newCategory;
+            exercise.rm = newRM;
+            exercise.favorite = newFavorite;
+            
+            // Actualizar el 1RM en todos los mesociclos que contienen este ejercicio
+            this.mesocycles.forEach(meso => {
+                meso.exercises.forEach(mesoEx => {
+                    if (mesoEx.exerciseId === id || mesoEx.id === id) {
+                        mesoEx.name = newName;
+                        mesoEx.category = newCategory;
+                        mesoEx.rm = newRM;
+                    }
+                });
+            });
+            
+            // Actualizar el 1RM en todas las sesiones completadas que contienen este ejercicio
+            this.sessions.forEach(session => {
+                session.exercises.forEach(sessionEx => {
+                    if (sessionEx.exerciseId === id || sessionEx.id === id) {
+                        sessionEx.name = newName;
+                        sessionEx.category = newCategory;
+                        sessionEx.rm = newRM;
+                    }
+                });
+            });
+            
+            // Actualizar el 1RM en la sesión actualmente cargada (si existe)
+            if (this.currentSession) {
+                this.currentSession.exercises.forEach(sessionEx => {
+                    if (sessionEx.exerciseId === id || sessionEx.id === id) {
+                        sessionEx.name = newName;
+                        sessionEx.category = newCategory;
+                        sessionEx.rm = newRM;
+                        
+                        // Recalcular el peso sugerido de cada serie basado en el nuevo 1RM
+                        sessionEx.sets.forEach(set => {
+                            if (set.percentage) {
+                                set.suggestedWeight = Math.round(newRM * (set.percentage / 100));
+                                // Solo actualizar el peso si no ha sido modificado manualmente (si coincide con el peso sugerido anterior)
+                                const oldSuggestedWeight = Math.round(exercise.rm * (set.percentage / 100));
+                                if (set.weight === oldSuggestedWeight || !set.weight) {
+                                    set.weight = set.suggestedWeight;
+                                }
+                            }
+                        });
+                    }
+                });
+                // Guardar la sesión actual en localStorage
+                localStorage.setItem('gym_current_session', JSON.stringify(this.currentSession));
+            }
             
             this.saveToStorage();
             this.renderExercises();
@@ -1063,22 +1120,10 @@ class GymTracker {
                                                placeholder="%" style="background: var(--card-bg-hover); color: var(--text-secondary);">
                                     </div>
                                     <div class="set-field">
-                                        <label>Reps objetivo</label>
+                                        <label>Reps</label>
                                         <input type="number" value="${set.targetReps || ''}" 
                                                onchange="gymTracker.updateSet('${ex.exerciseId}', ${setIndex}, 'targetReps', this.value)"
                                                readonly style="background: var(--card-bg-hover); color: var(--text-secondary);">
-                                    </div>
-                                    <div class="set-field">
-                                        <label>Reps hechas</label>
-                                        <input type="number" value="${set.actualReps || ''}" 
-                                               onchange="gymTracker.updateSet('${ex.exerciseId}', ${setIndex}, 'actualReps', this.value)"
-                                               placeholder="0">
-                                    </div>
-                                    <div class="set-field">
-                                        <label>RPE (1-10)</label>
-                                        <input type="number" min="1" max="10" value="${set.rpe || ''}" 
-                                               onchange="gymTracker.updateSet('${ex.exerciseId}', ${setIndex}, 'rpe', this.value)"
-                                               placeholder="RPE">
                                     </div>
                                     <div class="set-completed">
                                         <input type="checkbox" ${set.completed ? 'checked' : ''} 
@@ -1196,8 +1241,6 @@ class GymTracker {
             suggestedWeight: suggestedWeight,
             percentage: percentage,
             weight: suggestedWeight,
-            actualReps: '',
-            rpe: '',
             completed: false
         };
 
@@ -1261,6 +1304,33 @@ class GymTracker {
 
         this.currentSession.completed = true;
         this.currentSession.endDate = new Date().toISOString();
+        
+        // Actualizar 1RM de los ejercicios basado en las series completadas
+        this.currentSession.exercises.forEach(sessionEx => {
+            const exercise = this.exercises.find(e => e.id === sessionEx.exerciseId);
+            if (exercise) {
+                // Buscar la serie con mayor estimación de 1RM usando la fórmula de Brzycki
+                let maxEstimatedRM = exercise.rm;
+                
+                sessionEx.sets.forEach(set => {
+                    if (set.completed && set.weight && set.weight > 0) {
+                        const reps = set.targetReps || 1;
+                        // Fórmula de Brzycki: 1RM = peso / (1.0278 - 0.0278 * reps)
+                        const estimatedRM = Math.round(set.weight / (1.0278 - 0.0278 * reps));
+                        if (estimatedRM > maxEstimatedRM) {
+                            maxEstimatedRM = estimatedRM;
+                        }
+                    }
+                });
+                
+                // Actualizar el 1RM si se ha estimado uno mayor
+                if (maxEstimatedRM > exercise.rm) {
+                    exercise.rm = maxEstimatedRM;
+                    // Actualizar también el RM en la sesión
+                    sessionEx.rm = maxEstimatedRM;
+                }
+            }
+        });
         
         // Guardar sesión
         this.sessions.push(this.currentSession);
@@ -1363,12 +1433,12 @@ class GymTracker {
             session.exercises.forEach(ex => {
                 if (ex.exerciseId === exerciseId) {
                     ex.sets.forEach(set => {
-                        if (set.completed && set.weight && set.actualReps) {
+                        if (set.completed && set.weight && set.targetReps) {
                             exerciseData.push({
                                 date: new Date(session.date).toLocaleDateString('es-ES'),
                                 weight: set.weight,
-                                reps: set.actualReps,
-                                volume: set.weight * set.actualReps
+                                reps: set.targetReps,
+                                volume: set.weight * set.targetReps
                             });
                         }
                     });
@@ -1650,8 +1720,8 @@ class GymTracker {
         
         const totalVolume = session.exercises.reduce((total, ex) => {
             return total + ex.sets.reduce((exTotal, set) => {
-                if (set.completed && set.weight && set.actualReps) {
-                    return exTotal + (set.weight * set.actualReps);
+                if (set.completed && set.weight && set.targetReps) {
+                    return exTotal + (set.weight * set.targetReps);
                 }
                 return exTotal;
             }, 0);
@@ -1681,8 +1751,8 @@ class GymTracker {
             ${session.exercises.map(ex => {
                 const completedSets = ex.sets.filter(s => s.completed).length;
                 const exerciseVolume = ex.sets.reduce((sum, set) => {
-                    if (set.completed && set.weight && set.actualReps) {
-                        return sum + (set.weight * set.actualReps);
+                    if (set.completed && set.weight && set.targetReps) {
+                        return sum + (set.weight * set.targetReps);
                     }
                     return sum;
                 }, 0);
@@ -1713,9 +1783,8 @@ class GymTracker {
                                 <div class="set-detail-item ${set.completed ? 'completed' : ''}">
                                     <div style="font-weight: 600; color: var(--text-primary);">Serie ${idx + 1}</div>
                                     <div style="color: var(--text-secondary); font-size: 0.85rem; margin-top: 5px;">
-                                        ${set.weight ? set.weight + ' kg' : '-'} × ${set.actualReps || set.targetReps || '-'} reps
+                                        ${set.weight ? set.weight + ' kg' : '-'} × ${set.targetReps || '-'} reps
                                     </div>
-                                    ${set.rpe ? `<div style="color: var(--primary-light); font-size: 0.8rem; margin-top: 3px;">RPE ${set.rpe}</div>` : ''}
                                 </div>
                             `).join('')}
                         </div>
@@ -2267,7 +2336,7 @@ function generateAutoSets() {
         const exerciseHistory = gymTracker.sessions.flatMap(s =>
             s.exercises.filter(e => e.exerciseId === ex.exerciseId)
                 .flatMap(e => e.sets.filter(set => set.completed && set.weight > 0)
-                    .map(set => ({ weight: set.weight, reps: set.actualReps || set.targetReps })))
+                    .map(set => ({ weight: set.weight, reps: set.targetReps })))
         );
 
         let baseReps = Math.round(config.reps * mult.reps);
@@ -2337,8 +2406,6 @@ function generateAutoSets() {
                 suggestedWeight: setWeight,
                 percentage: setPercentage,
                 weight: setWeight,
-                actualReps: '',
-                rpe: '',
                 completed: false
             });
         }
