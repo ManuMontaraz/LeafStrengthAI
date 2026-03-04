@@ -22,6 +22,17 @@ class GymTracker {
         this.updateStatsExerciseSelect();
         this.renderPersonalRecords();
         this.updateSplitInfo();
+        this.checkForUpdates();
+    }
+
+    // Check for app updates and reload if necessary
+    checkForUpdates() {
+        // Check if we need to reload (set by service worker)
+        if (localStorage.getItem('gym_app_updated') === 'true') {
+            localStorage.removeItem('gym_app_updated');
+            console.log('App updated, reloading...');
+            window.location.reload();
+        }
     }
 
     // ==================== UTILIDADES ====================
@@ -2463,3 +2474,35 @@ setInterval(() => {
         localStorage.setItem('gym_current_session', JSON.stringify(gymTracker.currentSession));
     }
 }, 30000);
+
+// Function to clear all caches and reload
+function clearCacheAndReload() {
+    if (confirm('Esto limpiará toda la caché y recargará la página. ¿Continuar?')) {
+        // Clear all caches
+        if ('caches' in window) {
+            caches.keys().then(cacheNames => {
+                return Promise.all(
+                    cacheNames.map(cacheName => caches.delete(cacheName))
+                );
+            }).then(() => {
+                // Unregister service worker
+                if ('serviceWorker' in navigator) {
+                    navigator.serviceWorker.getRegistrations().then(registrations => {
+                        return Promise.all(
+                            registrations.map(registration => registration.unregister())
+                        );
+                    }).then(() => {
+                        // Clear localStorage app update flag
+                        localStorage.removeItem('gym_app_updated');
+                        // Reload page
+                        window.location.reload(true);
+                    });
+                } else {
+                    window.location.reload(true);
+                }
+            });
+        } else {
+            window.location.reload(true);
+        }
+    }
+}
