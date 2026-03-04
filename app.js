@@ -441,26 +441,35 @@ class GymTracker {
                 description: 'Alterna entre sesiones de torso (pecho, espalda, hombros, brazos) y piernas.',
                 sessions: [
                     { name: 'Torso', categories: ['pecho', 'espalda', 'hombros', 'brazos'] },
-                    { name: 'Pierna', categories: ['piernas', 'core'] }
+                    { name: 'Piernas + Core', categories: ['piernas', 'core'] }
+                ]
+            },
+            'torso-pierna-core': {
+                name: 'Torso / Pierna / Core',
+                description: 'Alterna entre sesiones de torso (pecho, espalda, hombros, brazos), piernas y core.',
+                sessions: [
+                    { name: 'Torso', categories: ['pecho', 'espalda', 'hombros', 'brazos'] },
+                    { name: 'Piernas', categories: ['piernas'] },
+                    { name: 'Core', categories: ['core'] }
                 ]
             },
             'tir-emp-pie': {
                 name: 'Tirón / Empuje / Pierna',
-                description: 'Divide en tres grupos: Tirón (espalda, bíceps), Empuje (pecho, hombros, tríceps), Pierna.',
+                description: 'Divide en tres grupos: Tirón (espalda, bíceps), Empuje (pecho, hombros, tríceps), Piernas.',
                 sessions: [
                     { name: 'Tirón', categories: ['tiron'] },
                     { name: 'Empuje', categories: ['empuje'] },
-                    { name: 'Pierna', categories: ['piernas'] }
+                    { name: 'Piernas + Core', categories: ['piernas', 'core'] }
                 ]
             },
-            'tir-emp-pie-brazos': {
-                name: 'Tirón / Empuje / Pierna / Brazos',
-                description: 'Añade un día específico para brazos al clásico PPL.',
+            'tir-emp-pie-core': {
+                name: 'Tirón / Empuje / Pierna / Core',
+                description: 'Versión de 4 días: Tirón, Empuje, Piernas (sin core), Core (específico).',
                 sessions: [
-                    { name: 'Tirón', categories: ['espalda'] },
-                    { name: 'Empuje', categories: ['pecho', 'hombros'] },
-                    { name: 'Pierna', categories: ['piernas', 'core'] },
-                    { name: 'Brazos', categories: ['brazos'] }
+                    { name: 'Tirón', categories: ['tiron'] },
+                    { name: 'Empuje', categories: ['empuje'] },
+                    { name: 'Piernas', categories: ['piernas'] },
+                    { name: 'Core', categories: ['core'] }
                 ]
             },
             'weider-5': {
@@ -470,20 +479,20 @@ class GymTracker {
                     { name: 'Pecho', categories: ['pecho'] },
                     { name: 'Espalda', categories: ['espalda'] },
                     { name: 'Hombros', categories: ['hombros'] },
-                    { name: 'Piernas', categories: ['piernas', 'core'] },
+                    { name: 'Piernas + Core', categories: ['piernas', 'core'] },
                     { name: 'Brazos', categories: ['brazos'] }
                 ]
             },
             'weider-6': {
-                name: 'Weider 6 días',
-                description: 'División intensiva: Pecho, Espalda, Hombros, Piernas, Brazos, Full Body o Descarga.',
+                name: 'Weider 6 + Core',
+                description: 'División intensiva: Pecho, Espalda, Hombros, Piernas, Brazos, Core.',
                 sessions: [
                     { name: 'Pecho', categories: ['pecho'] },
                     { name: 'Espalda', categories: ['espalda'] },
                     { name: 'Hombros', categories: ['hombros'] },
                     { name: 'Piernas', categories: ['piernas'] },
                     { name: 'Brazos', categories: ['brazos'] },
-                    { name: 'Full Body', categories: ['pecho', 'espalda', 'piernas', 'hombros', 'brazos', 'core'] }
+                    { name: 'Core', categories: ['core'] }
                 ]
             },
             'personalizado': {
@@ -496,8 +505,8 @@ class GymTracker {
 
     getSessionNameForSplit(split, sessionNumber) {
         const config = this.getSplitConfig()[split];
-        if (!config || config.sessions.length === 0) return `Sesión ${sessionNumber}`;
-        
+        if (!config || config.sessions.length === 0) return 'Personalizada';
+
         // Ciclar según el número de sesiones configuradas
         const sessionIndex = (sessionNumber - 1) % config.sessions.length;
         return config.sessions[sessionIndex].name;
@@ -519,8 +528,8 @@ class GymTracker {
     }
 
     // Genera un orden aleatorio de ejercicios para todo el mesociclo
-    getMesocycleExerciseOrder(mesoId, exercises, seed) {
-        const storageKey = `gym_meso_order_${mesoId}`;
+    getMesocycleExerciseOrder(mesoId, exercises, seed, sessionType = '') {
+        const storageKey = sessionType ? `gym_meso_order_${mesoId}_${sessionType}` : `gym_meso_order_${mesoId}`;
         const savedOrder = localStorage.getItem(storageKey);
         
         if (savedOrder) {
@@ -992,23 +1001,17 @@ class GymTracker {
             // Si hay menos ejercicios que el máximo, usarlos todos
             selectedExercises = filteredExercises;
         } else {
-            // Obtener orden aleatorio de ejercicios para todo el mesociclo
-            const mesoOrder = this.getMesocycleExerciseOrder(meso.id, filteredExercises, meso.createdAt);
+            // Mezcla aleatoria pura: barajar ejercicios y seleccionar los primeros N
+            selectedExercises = [...filteredExercises];
             
-            // Calcular qué ejercicios tocan en esta sesión (ciclando por todos los ejercicios)
-            const totalExercises = mesoOrder.length;
-            const sessionsNeeded = Math.ceil(totalExercises / maxExercises);
-            const blockIndex = ((sessionNumber - 1) % sessionsNeeded);
-            
-            const startIndex = blockIndex * maxExercises;
-            const endIndex = Math.min(startIndex + maxExercises, totalExercises);
-            
-            selectedExercises = mesoOrder.slice(startIndex, endIndex);
-            
-            // Si llegamos al final y quedan ejercicios sueltos, los mostramos en la siguiente sesión
-            if (selectedExercises.length === 0 && totalExercises > 0) {
-                selectedExercises = mesoOrder.slice(0, maxExercises);
+            // Fisher-Yates shuffle
+            for (let i = selectedExercises.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [selectedExercises[i], selectedExercises[j]] = [selectedExercises[j], selectedExercises[i]];
             }
+            
+            // Tomar solo los primeros maxExercises
+            selectedExercises = selectedExercises.slice(0, maxExercises);
         }
 
         // Crear la sesión con los ejercicios seleccionados
