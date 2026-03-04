@@ -1477,4 +1477,47 @@ header p {
     border-color: rgba(255, 255, 255, 0.3);
 }
 
+/* Category Checkbox Group */
+.category-checkbox-group {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    padding: 10px;
+    background: var(--bg-color);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+}
+
+.checkbox-inline {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-size: 0.9rem;
+    color: var(--text-primary);
+}
+
+.checkbox-inline:hover {
+    background: var(--card-bg-hover);
+    border-color: var(--primary-color);
+}
+
+.checkbox-inline input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    accent-color: var(--primary-color);
+    cursor: pointer;
+}
+
+.checkbox-inline:has(input[type="checkbox"]:checked) {
+    background: var(--primary-color);
+    border-color: var(--primary-color);
+    color: white;
+}
+
 

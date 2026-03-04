@@ -161,14 +161,19 @@ class GymTracker {
 
     addExercise() {
         const name = document.getElementById('exercise-name').value.trim();
-        const category = document.getElementById('exercise-category').value;
+        const categories = Array.from(document.querySelectorAll('input[name="exercise-category"]:checked')).map(cb => cb.value);
         const rm = parseFloat(document.getElementById('exercise-rm').value);
         const favorite = document.getElementById('exercise-favorite').checked;
+
+        if (categories.length === 0) {
+            this.showNotification('Selecciona al menos una categoría', 'warning');
+            return;
+        }
 
         const exercise = {
             id: this.generateId(),
             name,
-            category,
+            categories,
             rm,
             favorite,
             createdAt: new Date().toISOString()
@@ -190,11 +195,15 @@ class GymTracker {
         const searchTerm = document.getElementById('exercise-search').value.toLowerCase();
         const filter = document.getElementById('exercise-filter').value;
         
+        // Migrar datos antiguos si es necesario
+        this.migrateExercisesData();
+        
         let filtered = this.exercises.filter(ex => {
             const matchesSearch = ex.name.toLowerCase().includes(searchTerm);
             const matchesFilter = filter === 'all' || 
                                  (filter === 'favorites' && ex.favorite) ||
-                                 ex.category === filter;
+                                 (ex.categories && ex.categories.includes(filter)) ||
+                                 (ex.category === filter); // Compatibilidad hacia atrás
             return matchesSearch && matchesFilter;
         });
 
@@ -218,7 +227,7 @@ class GymTracker {
                 <div class="exercise-header">
                     <h4>${ex.name}</h4>
                 </div>
-                <span class="category-badge">${this.getCategoryName(ex.category)}</span>
+                <span class="category-badge">${this.getCategoryNames(ex.categories || [ex.category])}</span>
                 <div class="rm-value">
                     ${ex.rm} <span>kg 1RM</span>
                 </div>
@@ -234,6 +243,20 @@ class GymTracker {
         `).join('');
     }
 
+    migrateExercisesData() {
+        let needsMigration = false;
+        this.exercises.forEach(ex => {
+            if (ex.category && !ex.categories) {
+                ex.categories = [ex.category];
+                delete ex.category;
+                needsMigration = true;
+            }
+        });
+        if (needsMigration) {
+            this.saveToStorage();
+        }
+    }
+
     getCategoryName(category) {
         const categories = {
             pecho: 'Pecho',
@@ -242,9 +265,16 @@ class GymTracker {
             brazos: 'Brazos',
             piernas: 'Piernas',
             core: 'Core',
-            otros: 'Otros'
+            otros: 'Otros',
+            tiron: 'Tirón',
+            empuje: 'Empuje'
         };
         return categories[category] || category;
+    }
+
+    getCategoryNames(categories) {
+        if (!categories || categories.length === 0) return '';
+        return categories.map(cat => this.getCategoryName(cat)).join(', ');
     }
 
     toggleFavorite(id) {
@@ -260,11 +290,23 @@ class GymTracker {
         const exercise = this.exercises.find(e => e.id === id);
         if (!exercise) return;
 
+        // Migrar datos antiguos si es necesario
+        if (exercise.category && !exercise.categories) {
+            exercise.categories = [exercise.category];
+            delete exercise.category;
+            this.saveToStorage();
+        }
+
         document.getElementById('edit-exercise-id').value = exercise.id;
         document.getElementById('edit-exercise-name').value = exercise.name;
-        document.getElementById('edit-exercise-category').value = exercise.category;
         document.getElementById('edit-exercise-rm').value = exercise.rm;
         document.getElementById('edit-exercise-favorite').checked = exercise.favorite;
+
+        // Configurar checkboxes de categorías
+        const checkboxes = document.querySelectorAll('input[name="edit-exercise-category"]');
+        checkboxes.forEach(cb => {
+            cb.checked = exercise.categories && exercise.categories.includes(cb.value);
+        });
 
         document.getElementById('edit-modal').classList.add('active');
     }
@@ -275,22 +317,29 @@ class GymTracker {
         
         if (exercise) {
             const newName = document.getElementById('edit-exercise-name').value.trim();
-            const newCategory = document.getElementById('edit-exercise-category').value;
+            const newCategories = Array.from(document.querySelectorAll('input[name="edit-exercise-category"]:checked')).map(cb => cb.value);
             const newRM = parseFloat(document.getElementById('edit-exercise-rm').value);
             const newFavorite = document.getElementById('edit-exercise-favorite').checked;
+
+            if (newCategories.length === 0) {
+                this.showNotification('Selecciona al menos una categoría', 'warning');
+                return;
+            }
             
             exercise.name = newName;
-            exercise.category = newCategory;
+            exercise.categories = newCategories;
             exercise.rm = newRM;
             exercise.favorite = newFavorite;
+            delete exercise.category; // Eliminar campo antiguo si existe
             
             // Actualizar el 1RM en todos los mesociclos que contienen este ejercicio
             this.mesocycles.forEach(meso => {
                 meso.exercises.forEach(mesoEx => {
                     if (mesoEx.exerciseId === id || mesoEx.id === id) {
                         mesoEx.name = newName;
-                        mesoEx.category = newCategory;
+                        mesoEx.categories = [...newCategories];
                         mesoEx.rm = newRM;
+                        delete mesoEx.category;
                     }
                 });
             });
@@ -300,8 +349,9 @@ class GymTracker {
                 session.exercises.forEach(sessionEx => {
                     if (sessionEx.exerciseId === id || sessionEx.id === id) {
                         sessionEx.name = newName;
-                        sessionEx.category = newCategory;
+                        sessionEx.categories = [...newCategories];
                         sessionEx.rm = newRM;
+                        delete sessionEx.category;
                     }
                 });
             });
@@ -311,8 +361,9 @@ class GymTracker {
                 this.currentSession.exercises.forEach(sessionEx => {
                     if (sessionEx.exerciseId === id || sessionEx.id === id) {
                         sessionEx.name = newName;
-                        sessionEx.category = newCategory;
+                        sessionEx.categories = [...newCategories];
                         sessionEx.rm = newRM;
+                        delete sessionEx.category;
                         
                         // Recalcular el peso sugerido de cada serie basado en el nuevo 1RM
                         sessionEx.sets.forEach(set => {
@@ -397,9 +448,9 @@ class GymTracker {
                 name: 'Tirón / Empuje / Pierna',
                 description: 'Divide en tres grupos: Tirón (espalda, bíceps), Empuje (pecho, hombros, tríceps), Pierna.',
                 sessions: [
-                    { name: 'Tirón', categories: ['espalda', 'brazos'] },
-                    { name: 'Empuje', categories: ['pecho', 'hombros'] },
-                    { name: 'Pierna', categories: ['piernas', 'core'] }
+                    { name: 'Tirón', categories: ['tiron'] },
+                    { name: 'Empuje', categories: ['empuje'] },
+                    { name: 'Pierna', categories: ['piernas'] }
                 ]
             },
             'tir-emp-pie-brazos': {
@@ -551,7 +602,8 @@ class GymTracker {
                 return matchesSearch && ex.favorite;
             }
             
-            const matchesCategory = categoryFilter === 'all' || ex.category === categoryFilter;
+            const categories = ex.categories || (ex.category ? [ex.category] : []);
+            const matchesCategory = categoryFilter === 'all' || categories.includes(categoryFilter);
             return matchesSearch && matchesCategory;
         });
 
@@ -569,13 +621,15 @@ class GymTracker {
 
         container.innerHTML = filtered.map(ex => {
             const isSelected = this.selectedMesoExercises.has(ex.id);
+            const categories = ex.categories || (ex.category ? [ex.category] : []);
+            const categoryStr = categories.join(',');
             return `
             <label class="checkbox-exercise-item">
-                <input type="checkbox" value="${ex.id}" data-name="${ex.name}" data-rm="${ex.rm}" data-category="${ex.category}" 
+                <input type="checkbox" value="${ex.id}" data-name="${ex.name}" data-rm="${ex.rm}" data-category="${categoryStr}" 
                        ${isSelected ? 'checked' : ''} onchange="gymTracker.toggleMesoExerciseSelection(this)">
                 <div class="exercise-info">
                     <div class="exercise-name">${ex.name} ${ex.favorite ? '⭐' : ''}</div>
-                    <div class="exercise-rm">1RM: ${ex.rm}kg - ${this.getCategoryName(ex.category)}</div>
+                    <div class="exercise-rm">1RM: ${ex.rm}kg - ${this.getCategoryNames(categories)}</div>
                 </div>
             </label>
         `}).join('');
@@ -654,11 +708,16 @@ class GymTracker {
         this.selectedMesoExercises.forEach(exerciseId => {
             const exercise = this.exercises.find(e => e.id === exerciseId);
             if (exercise) {
+                // Migrar datos antiguos si es necesario
+                if (exercise.category && !exercise.categories) {
+                    exercise.categories = [exercise.category];
+                    delete exercise.category;
+                }
                 selectedExercises.push({
                     exerciseId: exercise.id,
                     name: exercise.name,
                     rm: exercise.rm,
-                    category: exercise.category,
+                    categories: exercise.categories || [],
                     sets: []
                 });
             }
@@ -821,7 +880,7 @@ class GymTracker {
             <h4 style="margin-bottom: 15px; color: var(--primary-light);">Ejercicios incluidos:</h4>
             ${meso.exercises.map(ex => `
                 <div class="meso-exercise-detail">
-                    <h5>${ex.name} (1RM: ${ex.rm}kg) <span style="font-weight: normal; color: var(--text-secondary); font-size: 0.85rem;">- ${this.getCategoryName(ex.category)}</span></h5>
+                    <h5>${ex.name} (1RM: ${ex.rm}kg) <span style="font-weight: normal; color: var(--text-secondary); font-size: 0.85rem;">- ${this.getCategoryNames(ex.categories || (ex.category ? [ex.category] : []))}</span></h5>
                     ${ex.sets && ex.sets.length > 0 ? `
                         <div class="sets-preview">
                             ${ex.sets.map((set, i) => `
@@ -905,10 +964,20 @@ class GymTracker {
             return;
         }
 
+        // Migrar ejercicios del mesociclo si es necesario
+        meso.exercises.forEach(ex => {
+            if (ex.category && !ex.categories) {
+                ex.categories = [ex.category];
+                delete ex.category;
+            }
+        });
+        this.saveToStorage();
+
         // Filtrar ejercicios que coincidan con las categorías del día
-        let filteredExercises = meso.exercises.filter(ex => 
-            targetCategories.includes(ex.category)
-        );
+        let filteredExercises = meso.exercises.filter(ex => {
+            const categories = ex.categories || (ex.category ? [ex.category] : []);
+            return categories.some(cat => targetCategories.includes(cat));
+        });
 
         if (filteredExercises.length === 0) {
             this.showNotification(`No hay ejercicios de ${sessionName} en este mesociclo. Verifica las categorías de los ejercicios.`, 'warning');
@@ -955,7 +1024,7 @@ class GymTracker {
                 exerciseId: ex.exerciseId,
                 name: ex.name,
                 rm: ex.rm,
-                category: ex.category,
+                categories: ex.categories || (ex.category ? [ex.category] : []),
                 sets: []
             })),
             completed: false
