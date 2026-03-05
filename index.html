@@ -850,11 +850,13 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="idbstorage.js"></script>
     <script src="app.js?v=2.0"></script>
     <script>
         // Inicializar la aplicación cuando el DOM esté listo
-        document.addEventListener('DOMContentLoaded', function() {
+        document.addEventListener('DOMContentLoaded', async function() {
             window.gymTracker = new GymTracker();
+            await window.gymTracker.init();
         });
     </script>
     

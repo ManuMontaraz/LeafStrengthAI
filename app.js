@@ -1,35 +1,49 @@
 // Gym Tracker Application
 class GymTracker {
     constructor() {
-        this.exercises = JSON.parse(localStorage.getItem('gym_exercises')) || [];
-        this.mesocycles = JSON.parse(localStorage.getItem('gym_mesocycles')) || [];
-        this.sessions = JSON.parse(localStorage.getItem('gym_sessions')) || [];
+        this.storage = new IDBStorage();
+        this.exercises = [];
+        this.mesocycles = [];
+        this.sessions = [];
         this.currentSession = null;
         this.currentSetExercise = null;
         this.currentMesoDetail = null;
         this.selectedMesoExercises = new Set(); // Para mantener selecciones persistentes
-        
-        this.init();
+        this.isReady = false;
     }
 
-    init() {
+    async init() {
+        await this.storage.init();
+        await this.loadFromStorage();
         this.setupEventListeners();
         this.updateDateDisplay();
-        this.renderExercises();
+        await this.renderExercises();
         this.renderMesocycles();
         this.updateStats();
-        this.updateMesocycleSelect();
+        await this.updateMesocycleSelect();
         this.updateStatsExerciseSelect();
         this.renderPersonalRecords();
         this.updateSplitInfo();
         this.checkForUpdates();
+        this.isReady = true;
+    }
+
+    async loadFromStorage() {
+        const exercisesData = await this.storage.getItem('gym_exercises');
+        const mesocyclesData = await this.storage.getItem('gym_mesocycles');
+        const sessionsData = await this.storage.getItem('gym_sessions');
+        
+        this.exercises = exercisesData ? JSON.parse(exercisesData) : [];
+        this.mesocycles = mesocyclesData ? JSON.parse(mesocyclesData) : [];
+        this.sessions = sessionsData ? JSON.parse(sessionsData) : [];
     }
 
     // Check for app updates and reload if necessary
-    checkForUpdates() {
+    async checkForUpdates() {
         // Check if we need to reload (set by service worker)
-        if (localStorage.getItem('gym_app_updated') === 'true') {
-            localStorage.removeItem('gym_app_updated');
+        const updated = await this.storage.getItem('gym_app_updated');
+        if (updated === 'true') {
+            await this.storage.removeItem('gym_app_updated');
             console.log('App updated, reloading...');
             window.location.reload();
         }
@@ -40,10 +54,10 @@ class GymTracker {
         return Date.now().toString(36) + Math.random().toString(36).substr(2);
     }
 
-    saveToStorage() {
-        localStorage.setItem('gym_exercises', JSON.stringify(this.exercises));
-        localStorage.setItem('gym_mesocycles', JSON.stringify(this.mesocycles));
-        localStorage.setItem('gym_sessions', JSON.stringify(this.sessions));
+    async saveToStorage() {
+        await this.storage.setItem('gym_exercises', JSON.stringify(this.exercises));
+        await this.storage.setItem('gym_mesocycles', JSON.stringify(this.mesocycles));
+        await this.storage.setItem('gym_sessions', JSON.stringify(this.sessions));
     }
 
     updateDateDisplay() {
@@ -62,32 +76,32 @@ class GymTracker {
         });
 
         // Formulario de ejercicios
-        document.getElementById('exercise-form').addEventListener('submit', (e) => {
+        document.getElementById('exercise-form').addEventListener('submit', async (e) => {
             e.preventDefault();
-            this.addExercise();
+            await this.addExercise();
         });
 
         // Formulario de edición
-        document.getElementById('edit-exercise-form').addEventListener('submit', (e) => {
+        document.getElementById('edit-exercise-form').addEventListener('submit', async (e) => {
             e.preventDefault();
-            this.updateExercise();
+            await this.updateExercise();
         });
 
         // Búsqueda y filtros de ejercicios
-        document.getElementById('exercise-search').addEventListener('input', () => this.renderExercises());
-        document.getElementById('exercise-filter').addEventListener('change', () => this.renderExercises());
+        document.getElementById('exercise-search').addEventListener('input', async () => await this.renderExercises());
+        document.getElementById('exercise-filter').addEventListener('change', async () => await this.renderExercises());
 
         // Formulario de mesociclos
-        document.getElementById('mesocycle-form').addEventListener('submit', (e) => {
+        document.getElementById('mesocycle-form').addEventListener('submit', async (e) => {
             e.preventDefault();
-            this.addMesocycle();
+            await this.addMesocycle();
         });
 
         // Búsqueda de ejercicios en mesociclo
-        document.getElementById('meso-exercise-search').addEventListener('input', () => this.renderMesoExercisesList());
+        document.getElementById('meso-exercise-search').addEventListener('input', async () => await this.renderMesoExercisesList());
 
         // Filtro por categoría/zona muscular en mesociclo
-        document.getElementById('meso-exercise-filter').addEventListener('change', () => this.renderMesoExercisesList());
+        document.getElementById('meso-exercise-filter').addEventListener('change', async () => await this.renderMesoExercisesList());
 
         // Cambio de modo de división
         document.getElementById('meso-split').addEventListener('change', () => this.updateSplitInfo());
@@ -120,33 +134,33 @@ class GymTracker {
         }, true);
 
         // Cambio de mesociclo activo - limpiar sesión actual
-        document.getElementById('active-mesocycle').addEventListener('change', () => {
+        document.getElementById('active-mesocycle').addEventListener('change', async () => {
             if (this.currentSession) {
                 this.currentSession = null;
-                localStorage.removeItem('gym_current_session');
+                await this.storage.removeItem('gym_current_session');
                 this.renderSession();
             }
         });
     }
 
-    switchTab(tabId) {
+    async switchTab(tabId) {
         document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
         document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
-        
+
         document.querySelector(`.tab-btn[data-tab="${tabId}"]`).classList.add('active');
         document.getElementById(tabId).classList.add('active');
 
         // Actualizar datos específicos del tab
         if (tabId === 'exercises') {
-            this.renderExercises();
+            await this.renderExercises();
         } else if (tabId === 'mesocycles') {
-            this.renderMesoExercisesList();
+            await this.renderMesoExercisesList();
         } else if (tabId === 'session') {
-            this.updateMesocycleSelect();
+            await this.updateMesocycleSelect();
             // Cargar sesión anterior automáticamente si existe
-            const savedSession = localStorage.getItem('gym_current_session');
+            const savedSession = await this.storage.getItem('gym_current_session');
             if (savedSession) {
-                this.loadPreviousSession();
+                await this.loadPreviousSession();
             }
         } else if (tabId === 'stats') {
             this.updateStats();
@@ -159,7 +173,7 @@ class GymTracker {
         }
     }
 
-    addExercise() {
+    async addExercise() {
         const name = document.getElementById('exercise-name').value.trim();
         const categories = Array.from(document.querySelectorAll('input[name="exercise-category"]:checked')).map(cb => cb.value);
         const rm = parseFloat(document.getElementById('exercise-rm').value);
@@ -180,23 +194,23 @@ class GymTracker {
         };
 
         this.exercises.push(exercise);
-        this.saveToStorage();
+        await this.saveToStorage();
         
         document.getElementById('exercise-form').reset();
-        this.renderExercises();
-        this.renderMesoExercisesList();
+        await this.renderExercises();
+        await this.renderMesoExercisesList();
         this.updateStats();
         this.updateStatsExerciseSelect();
 
         this.showNotification('Ejercicio guardado correctamente', 'success');
     }
 
-    renderExercises() {
+    async renderExercises() {
         const searchTerm = document.getElementById('exercise-search').value.toLowerCase();
         const filter = document.getElementById('exercise-filter').value;
-        
+
         // Migrar datos antiguos si es necesario
-        this.migrateExercisesData();
+        await this.migrateExercisesData();
         
         let filtered = this.exercises.filter(ex => {
             const matchesSearch = ex.name.toLowerCase().includes(searchTerm);
@@ -243,7 +257,7 @@ class GymTracker {
         `).join('');
     }
 
-    migrateExercisesData() {
+    async migrateExercisesData() {
         let needsMigration = false;
         this.exercises.forEach(ex => {
             if (ex.category && !ex.categories) {
@@ -253,7 +267,7 @@ class GymTracker {
             }
         });
         if (needsMigration) {
-            this.saveToStorage();
+            await this.saveToStorage();
         }
     }
 
@@ -277,16 +291,16 @@ class GymTracker {
         return categories.map(cat => this.getCategoryName(cat)).join(', ');
     }
 
-    toggleFavorite(id) {
+    async toggleFavorite(id) {
         const exercise = this.exercises.find(e => e.id === id);
         if (exercise) {
             exercise.favorite = !exercise.favorite;
-            this.saveToStorage();
-            this.renderExercises();
+            await this.saveToStorage();
+            await this.renderExercises();
         }
     }
 
-    editExercise(id) {
+    async editExercise(id) {
         const exercise = this.exercises.find(e => e.id === id);
         if (!exercise) return;
 
@@ -294,7 +308,7 @@ class GymTracker {
         if (exercise.category && !exercise.categories) {
             exercise.categories = [exercise.category];
             delete exercise.category;
-            this.saveToStorage();
+            await this.saveToStorage();
         }
 
         document.getElementById('edit-exercise-id').value = exercise.id;
@@ -311,10 +325,10 @@ class GymTracker {
         document.getElementById('edit-modal').classList.add('active');
     }
 
-    updateExercise() {
+    async updateExercise() {
         const id = document.getElementById('edit-exercise-id').value;
         const exercise = this.exercises.find(e => e.id === id);
-        
+
         if (exercise) {
             const newName = document.getElementById('edit-exercise-name').value.trim();
             const newCategories = Array.from(document.querySelectorAll('input[name="edit-exercise-category"]:checked')).map(cb => cb.value);
@@ -325,13 +339,13 @@ class GymTracker {
                 this.showNotification('Selecciona al menos una categoría', 'warning');
                 return;
             }
-            
+
             exercise.name = newName;
             exercise.categories = newCategories;
             exercise.rm = newRM;
             exercise.favorite = newFavorite;
             delete exercise.category; // Eliminar campo antiguo si existe
-            
+
             // Actualizar el 1RM en todos los mesociclos que contienen este ejercicio
             this.mesocycles.forEach(meso => {
                 meso.exercises.forEach(mesoEx => {
@@ -343,7 +357,7 @@ class GymTracker {
                     }
                 });
             });
-            
+
             // Actualizar el 1RM en todas las sesiones completadas que contienen este ejercicio
             this.sessions.forEach(session => {
                 session.exercises.forEach(sessionEx => {
@@ -355,7 +369,7 @@ class GymTracker {
                     }
                 });
             });
-            
+
             // Actualizar el 1RM en la sesión actualmente cargada (si existe)
             if (this.currentSession) {
                 this.currentSession.exercises.forEach(sessionEx => {
@@ -364,7 +378,7 @@ class GymTracker {
                         sessionEx.categories = [...newCategories];
                         sessionEx.rm = newRM;
                         delete sessionEx.category;
-                        
+
                         // Recalcular el peso sugerido de cada serie basado en el nuevo 1RM
                         sessionEx.sets.forEach(set => {
                             if (set.percentage) {
@@ -378,24 +392,24 @@ class GymTracker {
                         });
                     }
                 });
-                // Guardar la sesión actual en localStorage
-                localStorage.setItem('gym_current_session', JSON.stringify(this.currentSession));
+                // Guardar la sesión actual en storage
+                await this.storage.setItem('gym_current_session', JSON.stringify(this.currentSession));
             }
-            
-            this.saveToStorage();
-            this.renderExercises();
-            this.renderMesoExercisesList();
+
+            await this.saveToStorage();
+            await this.renderExercises();
+            await this.renderMesoExercisesList();
             this.closeModal('edit-modal');
             this.showNotification('Ejercicio actualizado', 'success');
         }
     }
 
-    deleteExercise(id) {
+    async deleteExercise(id) {
         if (confirm('¿Estás seguro de eliminar este ejercicio?')) {
             this.exercises = this.exercises.filter(e => e.id !== id);
-            this.saveToStorage();
-            this.renderExercises();
-            this.renderMesoExercisesList();
+            await this.saveToStorage();
+            await this.renderExercises();
+            await this.renderMesoExercisesList();
             this.updateStats();
             this.updateStatsExerciseSelect();
             this.showNotification('Ejercicio eliminado', 'success');
@@ -528,19 +542,19 @@ class GymTracker {
     }
 
     // Genera un orden aleatorio de ejercicios para todo el mesociclo
-    getMesocycleExerciseOrder(mesoId, exercises, seed, sessionType = '') {
+    async getMesocycleExerciseOrder(mesoId, exercises, seed, sessionType = '') {
         const storageKey = sessionType ? `gym_meso_order_${mesoId}_${sessionType}` : `gym_meso_order_${mesoId}`;
-        const savedOrder = localStorage.getItem(storageKey);
-        
+        const savedOrder = await this.storage.getItem(storageKey);
+
         if (savedOrder) {
             const order = JSON.parse(savedOrder);
             // Reconstruir el array de ejercicios en el orden guardado
             const orderedExercises = order.map(id => exercises.find(ex => ex.exerciseId === id || ex.id === id)).filter(Boolean);
-            
+
             // Añadir ejercicios nuevos que no estaban en el orden guardado
             const orderedIds = new Set(order);
             const newExercises = exercises.filter(ex => !orderedIds.has(ex.exerciseId) && !orderedIds.has(ex.id));
-            
+
             if (newExercises.length > 0) {
                 // Mezclar los nuevos ejercicios aleatoriamente
                 const random = this.seededRandom(Date.now());
@@ -551,12 +565,12 @@ class GymTracker {
                 // Añadir al final y actualizar el orden guardado
                 orderedExercises.push(...newExercises);
                 const updatedOrderIds = orderedExercises.map(ex => ex.exerciseId || ex.id);
-                localStorage.setItem(storageKey, JSON.stringify(updatedOrderIds));
+                await this.storage.setItem(storageKey, JSON.stringify(updatedOrderIds));
             }
-            
+
             return orderedExercises;
         }
-        
+
         // Si no hay orden guardado, generar uno aleatorio
         const shuffled = [...exercises];
         // Fisher-Yates shuffle con seed
@@ -565,11 +579,11 @@ class GymTracker {
             const j = Math.floor(random() * (i + 1));
             [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
         }
-        
+
         // Guardar el orden
         const orderIds = shuffled.map(ex => ex.exerciseId || ex.id);
-        localStorage.setItem(storageKey, JSON.stringify(orderIds));
-        
+        await this.storage.setItem(storageKey, JSON.stringify(orderIds));
+
         return shuffled;
     }
 
@@ -598,7 +612,7 @@ class GymTracker {
     }
 
     // ==================== MESOCICLOS ====================
-    renderMesoExercisesList() {
+    async renderMesoExercisesList() {
         const searchTerm = document.getElementById('meso-exercise-search').value.toLowerCase();
         const categoryFilter = document.getElementById('meso-exercise-filter').value;
         const container = document.getElementById('meso-exercises-list');
@@ -703,7 +717,7 @@ class GymTracker {
         this.showNotification(`${count} selecciones eliminadas`, 'success');
     }
 
-    addMesocycle() {
+    async addMesocycle() {
         const name = document.getElementById('meso-name').value.trim();
         const duration = parseInt(document.getElementById('meso-duration').value);
         const description = document.getElementById('meso-description').value.trim();
@@ -711,7 +725,7 @@ class GymTracker {
         const objective = document.getElementById('meso-objetivo').value;
         const maxExercisesPerSession = parseInt(document.getElementById('meso-max-exercises').value) || 6;
         const sessionsPerWeek = parseInt(document.getElementById('meso-sessions-per-week').value) || 3;
-        
+
         // Obtener ejercicios seleccionados desde el Set persistente
         const selectedExercises = [];
         this.selectedMesoExercises.forEach(exerciseId => {
@@ -753,17 +767,17 @@ class GymTracker {
         };
 
         this.mesocycles.push(mesocycle);
-        this.saveToStorage();
-        
+        await this.saveToStorage();
+
         // Limpiar selecciones
         this.selectedMesoExercises.clear();
         
         document.getElementById('mesocycle-form').reset();
         this.updateSplitInfo();
-        this.renderMesoExercisesList();
+        await this.renderMesoExercisesList();
         this.renderMesocycles();
         this.updateStats();
-        this.updateMesocycleSelect();
+        await this.updateMesocycleSelect();
 
         this.showNotification('Mesociclo creado correctamente', 'success');
     }
@@ -904,7 +918,7 @@ class GymTracker {
         document.getElementById('meso-detail-modal').classList.add('active');
     }
 
-    deleteCurrentMesocycle() {
+    async deleteCurrentMesocycle() {
         if (!this.currentMesoDetail) return;
 
         if (confirm('¿Estás seguro de eliminar este mesociclo? Se perderán todos los datos asociados.')) {
@@ -912,19 +926,19 @@ class GymTracker {
             this.sessions = this.sessions.filter(s => s.mesocycleId !== this.currentMesoDetail);
 
             // Limpiar orden aleatorio guardado para este mesociclo
-            localStorage.removeItem(`gym_meso_order_${this.currentMesoDetail}`);
+            await this.storage.removeItem(`gym_meso_order_${this.currentMesoDetail}`);
 
-            this.saveToStorage();
+            await this.saveToStorage();
             this.renderMesocycles();
             this.updateStats();
-            this.updateMesocycleSelect();
+            await this.updateMesocycleSelect();
             this.closeModal('meso-detail-modal');
             this.showNotification('Mesociclo eliminado', 'success');
         }
     }
 
     // ==================== SESIONES ====================
-    updateMesocycleSelect() {
+    async updateMesocycleSelect() {
         const select = document.getElementById('active-mesocycle');
         select.innerHTML = '<option value="">Seleccionar mesociclo...</option>' +
             this.mesocycles.map(m => {
@@ -935,14 +949,14 @@ class GymTracker {
             }).join('');
 
         // Restaurar sesión si hay una guardada
-        const savedSession = localStorage.getItem('gym_current_session');
+        const savedSession = await this.storage.getItem('gym_current_session');
         if (savedSession) {
             const session = JSON.parse(savedSession);
             select.value = session.mesocycleId;
         }
     }
 
-    startNewSession() {
+    async startNewSession() {
         const mesoId = document.getElementById('active-mesocycle').value;
         if (!mesoId) {
             this.showNotification('Selecciona un mesociclo primero', 'warning');
@@ -1033,7 +1047,7 @@ class GymTracker {
             completed: false
         };
 
-        localStorage.setItem('gym_current_session', JSON.stringify(this.currentSession));
+        await this.storage.setItem('gym_current_session', JSON.stringify(this.currentSession));
         this.renderSession();
         
         const totalInCategory = filteredExercises.length;
@@ -1101,9 +1115,9 @@ class GymTracker {
         this.updateSelectedCount();
     }
 
-    confirmSessionExercises() {
+    async confirmSessionExercises() {
         const selectedCheckboxes = document.querySelectorAll('#session-exercises-list input[type="checkbox"]:checked');
-        
+
         if (selectedCheckboxes.length === 0) {
             this.showNotification('Selecciona al menos un ejercicio', 'warning');
             return;
@@ -1140,21 +1154,21 @@ class GymTracker {
             completed: false
         };
 
-        localStorage.setItem('gym_current_session', JSON.stringify(this.currentSession));
+        await this.storage.setItem('gym_current_session', JSON.stringify(this.currentSession));
         this.closeModal('session-exercises-modal');
         this.renderSession();
         this.showNotification(`Sesión ${sessionNumber}${sessionName ? ': ' + sessionName : ''} - ${selectedExercises.length} ejercicios`, 'success');
     }
 
-    loadPreviousSession() {
-        const savedSession = localStorage.getItem('gym_current_session');
+    async loadPreviousSession() {
+        const savedSession = await this.storage.getItem('gym_current_session');
         if (savedSession) {
             this.currentSession = JSON.parse(savedSession);
             document.getElementById('active-mesocycle').value = this.currentSession.mesocycleId;
             // Si la sesión no tiene sessionName, intentar obtenerlo del modo
             if (!this.currentSession.sessionName && this.currentSession.split) {
                 this.currentSession.sessionName = this.getSessionNameForSplit(
-                    this.currentSession.split, 
+                    this.currentSession.split,
                     this.currentSession.sessionNumber || 1
                 );
             }
@@ -1329,12 +1343,12 @@ class GymTracker {
         document.getElementById('calculated-weight').textContent = weight + ' kg';
     }
 
-    saveSetConfig() {
+    async saveSetConfig() {
         if (!this.currentSetExercise) return;
 
         const percentage = parseFloat(document.getElementById('set-percentage').value);
         const reps = parseInt(document.getElementById('set-reps').value);
-        
+
         const exercise = this.currentSession.exercises[this.currentSetExercise.exerciseIndex];
         const suggestedWeight = Math.round(exercise.rm * (percentage / 100));
 
@@ -1347,58 +1361,58 @@ class GymTracker {
         };
 
         exercise.sets.push(newSet);
-        
-        localStorage.setItem('gym_current_session', JSON.stringify(this.currentSession));
+
+        await this.storage.setItem('gym_current_session', JSON.stringify(this.currentSession));
         this.closeModal('set-modal');
         this.renderSession();
     }
 
-    updateSet(exerciseId, setIndex, field, value) {
+    async updateSet(exerciseId, setIndex, field, value) {
         const exercise = this.currentSession.exercises.find(e => e.exerciseId === exerciseId);
         if (exercise && exercise.sets[setIndex]) {
             exercise.sets[setIndex][field] = value === '' ? '' : parseFloat(value);
-            localStorage.setItem('gym_current_session', JSON.stringify(this.currentSession));
+            await this.storage.setItem('gym_current_session', JSON.stringify(this.currentSession));
         }
     }
 
-    updateSetPercentage(exerciseId, setIndex, percentage) {
+    async updateSetPercentage(exerciseId, setIndex, percentage) {
         const exercise = this.currentSession.exercises.find(e => e.exerciseId === exerciseId);
         if (exercise && exercise.sets[setIndex]) {
             const newPercentage = percentage === '' ? '' : parseFloat(percentage);
             exercise.sets[setIndex].percentage = newPercentage;
-            
+
             // Recalcular peso sugerido basado en el nuevo porcentaje
             if (newPercentage && !isNaN(newPercentage)) {
                 exercise.sets[setIndex].suggestedWeight = Math.round(exercise.rm * (newPercentage / 100));
             }
-            
-            localStorage.setItem('gym_current_session', JSON.stringify(this.currentSession));
+
+            await this.storage.setItem('gym_current_session', JSON.stringify(this.currentSession));
             this.renderSession();
         }
     }
 
-    toggleSetComplete(exerciseId, setIndex) {
+    async toggleSetComplete(exerciseId, setIndex) {
         const exercise = this.currentSession.exercises.find(e => e.exerciseId === exerciseId);
         if (exercise && exercise.sets[setIndex]) {
             exercise.sets[setIndex].completed = !exercise.sets[setIndex].completed;
-            localStorage.setItem('gym_current_session', JSON.stringify(this.currentSession));
+            await this.storage.setItem('gym_current_session', JSON.stringify(this.currentSession));
         }
     }
 
-    removeSet(exerciseId, setIndex) {
+    async removeSet(exerciseId, setIndex) {
         if (!confirm('¿Estás seguro de que quieres eliminar esta serie?')) {
             return;
         }
-        
+
         const exercise = this.currentSession.exercises.find(e => e.exerciseId === exerciseId);
         if (exercise) {
             exercise.sets.splice(setIndex, 1);
-            localStorage.setItem('gym_current_session', JSON.stringify(this.currentSession));
+            await this.storage.setItem('gym_current_session', JSON.stringify(this.currentSession));
             this.renderSession();
         }
     }
 
-    finishSession() {
+    async finishSession() {
         if (!this.currentSession) return;
 
         // Verificar que haya al menos una serie
@@ -1410,14 +1424,14 @@ class GymTracker {
 
         this.currentSession.completed = true;
         this.currentSession.endDate = new Date().toISOString();
-        
+
         // Actualizar 1RM de los ejercicios basado en las series completadas
         this.currentSession.exercises.forEach(sessionEx => {
             const exercise = this.exercises.find(e => e.id === sessionEx.exerciseId);
             if (exercise) {
                 // Buscar la serie con mayor estimación de 1RM usando la fórmula de Brzycki
                 let maxEstimatedRM = exercise.rm;
-                
+
                 sessionEx.sets.forEach(set => {
                     if (set.completed && set.weight && set.weight > 0) {
                         const reps = set.targetReps || 1;
@@ -1428,7 +1442,7 @@ class GymTracker {
                         }
                     }
                 });
-                
+
                 // Actualizar el 1RM si se ha estimado uno mayor
                 if (maxEstimatedRM > exercise.rm) {
                     exercise.rm = maxEstimatedRM;
@@ -1437,16 +1451,16 @@ class GymTracker {
                 }
             }
         });
-        
+
         // Guardar sesión
         this.sessions.push(this.currentSession);
-        
+
         // Actualizar contador de sesiones completadas del mesociclo
         const meso = this.mesocycles.find(m => m.id === this.currentSession.mesocycleId);
         let isMesocycleCompleted = false;
         if (meso) {
             meso.completedSessions = (meso.completedSessions || 0) + 1;
-            
+
             // Verificar si el mesociclo se ha completado
             const totalSessionsNeeded = meso.duration * (meso.sessionsPerWeek || 3);
             if (meso.completedSessions >= totalSessionsNeeded && meso.status === 'active') {
@@ -1454,16 +1468,16 @@ class GymTracker {
                 isMesocycleCompleted = true;
             }
         }
-        
-        this.saveToStorage();
-        
+
+        await this.saveToStorage();
+
         // Limpiar sesión actual
-        localStorage.removeItem('gym_current_session');
+        await this.storage.removeItem('gym_current_session');
         this.currentSession = null;
-        
+
         this.renderSession();
         this.updateStats();
-        
+
         if (isMesocycleCompleted) {
             this.showNotification('🎉 ¡Mesociclo completado! Has terminado todas las sesiones programadas.', 'success');
             setTimeout(() => {
@@ -2035,20 +2049,20 @@ function closeModal(modalId) {
     gymTracker.closeModal(modalId);
 }
 
-function saveSetConfig() {
-    gymTracker.saveSetConfig();
+async function saveSetConfig() {
+    await gymTracker.saveSetConfig();
 }
 
-function startNewSession() {
-    gymTracker.startNewSession();
+async function startNewSession() {
+    await gymTracker.startNewSession();
 }
 
-function loadPreviousSession() {
-    gymTracker.loadPreviousSession();
+async function loadPreviousSession() {
+    await gymTracker.loadPreviousSession();
 }
 
-function deleteCurrentMesocycle() {
-    gymTracker.deleteCurrentMesocycle();
+async function deleteCurrentMesocycle() {
+    await gymTracker.deleteCurrentMesocycle();
 }
 
 function exportData() {
@@ -2141,11 +2155,11 @@ function importData() {
     document.getElementById('import-confirm-modal').classList.add('active');
 }
 
-function confirmImport() {
+async function confirmImport() {
     if (!pendingImportData) return;
-    
+
     const mode = document.querySelector('input[name="import-mode"]:checked').value;
-    
+
     if (mode === 'replace') {
         // Reemplazar todo
         gymTracker.exercises = pendingImportData.exercises;
@@ -2156,78 +2170,78 @@ function confirmImport() {
         const existingExerciseIds = new Set(gymTracker.exercises.map(e => e.id));
         const existingMesoIds = new Set(gymTracker.mesocycles.map(m => m.id));
         const existingSessionIds = new Set(gymTracker.sessions.map(s => s.id));
-        
+
         pendingImportData.exercises.forEach(ex => {
             if (!existingExerciseIds.has(ex.id)) {
                 gymTracker.exercises.push(ex);
             }
         });
-        
+
         pendingImportData.mesocycles.forEach(meso => {
             if (!existingMesoIds.has(meso.id)) {
                 gymTracker.mesocycles.push(meso);
             }
         });
-        
+
         pendingImportData.sessions.forEach(session => {
             if (!existingSessionIds.has(session.id)) {
                 gymTracker.sessions.push(session);
             }
         });
     }
-    
-    gymTracker.saveToStorage();
-    gymTracker.init();
-    
+
+    await gymTracker.saveToStorage();
+    await gymTracker.init();
+
     // Limpiar
     pendingImportData = null;
     document.getElementById('import-file').value = '';
     document.getElementById('import-preview').classList.add('hidden');
     closeModal('import-confirm-modal');
-    
+
     gymTracker.showNotification(`Datos importados correctamente (${mode === 'merge' ? 'fusionados' : 'reemplazados'})`, 'success');
 }
 
-function clearAllData() {
+async function clearAllData() {
     if (confirm('¿Estás seguro de que quieres borrar TODOS los datos? Esta acción no se puede deshacer.\n\nRecomendación: Exporta un backup primero.')) {
         if (confirm('Última advertencia: ¿Realmente quieres eliminar todos tus ejercicios, mesociclos y sesiones?')) {
             gymTracker.exercises = [];
             gymTracker.mesocycles = [];
             gymTracker.sessions = [];
             gymTracker.currentSession = null;
-            localStorage.removeItem('gym_current_session');
+            await gymTracker.storage.removeItem('gym_current_session');
 
             // Limpiar todos los órdenes aleatorios de mesociclos
-            for (let i = localStorage.length - 1; i >= 0; i--) {
-                const key = localStorage.key(i);
+            const keys = await gymTracker.storage.keys();
+            for (const key of keys) {
                 if (key && key.startsWith('gym_meso_order_')) {
-                    localStorage.removeItem(key);
+                    await gymTracker.storage.removeItem(key);
                 }
             }
 
-            gymTracker.saveToStorage();
-            gymTracker.init();
+            await gymTracker.saveToStorage();
+            await gymTracker.init();
             gymTracker.showNotification('Todos los datos han sido eliminados', 'success');
         }
     }
 }
 
-function clearSessionsOnly() {
+async function clearSessionsOnly() {
     if (confirm('¿Estás seguro de que quieres borrar solo las sesiones completadas? Los ejercicios y mesociclos se mantendrán.')) {
         gymTracker.sessions = [];
         gymTracker.mesocycles.forEach(m => m.completedSessions = 0);
-        gymTracker.saveToStorage();
+        await gymTracker.saveToStorage();
         gymTracker.updateStats();
         gymTracker.renderPersonalRecords();
         gymTracker.showNotification('Sesiones eliminadas correctamente', 'success');
     }
 }
 
-function clearMesocyclesOnly() {
+async function clearMesocyclesOnly() {
     if (confirm('¿Estás seguro de que quieres borrar todos los mesociclos? Los ejercicios y sesiones completadas se mantendrán.')) {
         if (confirm('Última advertencia: ¿Realmente quieres eliminar todos los mesociclos?')) {
             gymTracker.mesocycles = [];
-            gymTracker.saveToStorage();
+            await gymTracker.saveToStorage();
             gymTracker.updateStats();
             gymTracker.updateMesocycleSelect();
             gymTracker.renderMesocycles();
@@ -2236,11 +2250,11 @@ function clearMesocyclesOnly() {
     }
 }
 
-function clearExercisesOnly() {
+async function clearExercisesOnly() {
     if (confirm('¿Estás seguro de que quieres borrar todos los ejercicios? Los mesociclos y sesiones completadas se mantendrán, pero los ejercicios en ellos quedarán sin referencia.')) {
         if (confirm('Última advertencia: ¿Realmente quieres eliminar todos los ejercicios?')) {
             gymTracker.exercises = [];
-            gymTracker.saveToStorage();
+            await gymTracker.saveToStorage();
             gymTracker.updateStats();
             gymTracker.updateStatsExerciseSelect();
             gymTracker.renderExercises();
@@ -2354,8 +2368,8 @@ function deselectAllSessionExercises() {
     gymTracker.deselectAllSessionExercises();
 }
 
-function confirmSessionExercises() {
-    gymTracker.confirmSessionExercises();
+async function confirmSessionExercises() {
+    await gymTracker.confirmSessionExercises();
 }
 
 function updateSplitInfo() {
@@ -2388,7 +2402,7 @@ function renderAutoSetsPreview() {
     `).join('');
 }
 
-function generateAutoSets() {
+async function generateAutoSets() {
     if (!gymTracker.currentSession) {
         gymTracker.showNotification('No hay una sesión activa', 'warning');
         return;
@@ -2591,7 +2605,7 @@ function generateAutoSets() {
     });
     
     // Guardar y actualizar
-    localStorage.setItem('gym_current_session', JSON.stringify(gymTracker.currentSession));
+    await gymTracker.storage.setItem('gym_current_session', JSON.stringify(gymTracker.currentSession));
     gymTracker.renderSession();
     closeModal('auto-sets-modal');
     
@@ -2638,9 +2652,9 @@ style.textContent = `
 document.head.appendChild(style);
 
 // Auto-guardar sesión cada 30 segundos
-setInterval(() => {
+setInterval(async () => {
     if (gymTracker.currentSession) {
-        localStorage.setItem('gym_current_session', JSON.stringify(gymTracker.currentSession));
+        await gymTracker.storage.setItem('gym_current_session', JSON.stringify(gymTracker.currentSession));
     }
 }, 30000);
 
@@ -2660,9 +2674,9 @@ function clearCacheAndReload() {
                         return Promise.all(
                             registrations.map(registration => registration.unregister())
                         );
-                    }).then(() => {
-                        // Clear localStorage app update flag
-                        localStorage.removeItem('gym_app_updated');
+                    }).then(async () => {
+                        // Clear storage app update flag
+                        await gymTracker.storage.removeItem('gym_app_updated');
                         // Reload page
                         window.location.reload(true);
                     });
