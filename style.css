@@ -676,6 +676,12 @@ header p {
     min-width: 120px;
     justify-content: center;
 }
+ 
+#session-exercises-container{
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 25px;
+}
 
 .sets-container {
     padding: 20px;
@@ -1193,11 +1199,17 @@ header p {
     }
     
     .modal-content {
-        margin: 10px;
-        max-height: 95vh;
+        max-width: 90dvw !important;
+        position: fixed;
+        display: grid;
+        grid-template-rows: 4rem 1fr 6rem;
     }
     
     /* Layout en 1 columna para móvil pequeño */
+    #session-exercises-container{
+        grid-template-columns: unset;
+    }
+    
     .session-exercise-header {
         position: sticky;
         left: 0px;
@@ -1520,5 +1532,3 @@ header p {
     border-color: var(--primary-color);
     color: white;
 }
-
-

@@ -10,6 +10,7 @@ class GymTracker {
         this.currentMesoDetail = null;
         this.selectedMesoExercises = new Set(); // Para mantener selecciones persistentes
         this.isReady = false;
+        this.tempSessionExercises = []; // Para edición temporal de ejercicios en sesión
     }
 
     async init() {
@@ -1178,6 +1179,195 @@ class GymTracker {
         }
     }
 
+    // ==================== EDITAR EJERCICIOS DE SESIÓN ====================
+    openEditSessionExercisesModal() {
+        if (!this.currentSession) {
+            this.showNotification('No hay sesión activa', 'warning');
+            return;
+        }
+
+        // Inicializar el array temporal con los ejercicios actuales
+        this.tempSessionExercises = JSON.parse(JSON.stringify(this.currentSession.exercises));
+        
+        // Limpiar búsqueda
+        document.getElementById('available-exercises-search').value = '';
+        
+        // Renderizar paneles
+        this.renderCurrentSessionExercisesList();
+        this.renderAvailableExercisesList();
+        
+        // Abrir modal
+        document.getElementById('edit-session-exercises-modal').classList.add('active');
+    }
+
+    renderCurrentSessionExercisesList() {
+        const container = document.getElementById('current-session-exercises-list');
+        const countEl = document.getElementById('current-exercises-count');
+        
+        countEl.textContent = this.tempSessionExercises.length;
+        
+        if (this.tempSessionExercises.length === 0) {
+            container.innerHTML = `
+                <div style="text-align: center; padding: 40px 20px; color: var(--text-secondary);">
+                    <i class="fas fa-inbox" style="font-size: 2rem; margin-bottom: 10px; display: block;"></i>
+                    No hay ejercicios en esta sesión
+                </div>
+            `;
+            return;
+        }
+        
+        container.innerHTML = this.tempSessionExercises.map((ex, index) => {
+            const hasSets = ex.sets && ex.sets.length > 0;
+            const completedSets = ex.sets ? ex.sets.filter(s => s.completed).length : 0;
+            
+            return `
+                <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px; background: var(--card-bg); border-radius: 8px; margin-bottom: 8px; border: 1px solid var(--border-color);">
+                    <div style="flex: 1;">
+                        <div style="font-weight: 500; color: var(--text-primary);">${ex.name}</div>
+                        <div style="font-size: 0.85rem; color: var(--text-secondary);">
+                            1RM: ${ex.rm}kg
+                            ${hasSets ? `| ${ex.sets.length} series${completedSets > 0 ? ` (${completedSets} completadas)` : ''}` : ''}
+                        </div>
+                    </div>
+                    <button type="button" onclick="gymTracker.removeExerciseFromSession(${index})" 
+                            style="background: var(--danger-color); color: white; border: none; padding: 8px 12px; border-radius: 6px; cursor: pointer; font-size: 0.85rem;">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
+            `;
+        }).join('');
+    }
+
+    renderAvailableExercisesList() {
+        const container = document.getElementById('available-exercises-list');
+        const countEl = document.getElementById('available-exercises-count');
+        
+        // Obtener IDs de ejercicios ya en la sesión temporal
+        const currentExerciseIds = new Set(this.tempSessionExercises.map(ex => ex.exerciseId));
+        
+        // Obtener ejercicios del mesociclo que NO están en la sesión
+        const meso = this.mesocycles.find(m => m.id === this.currentSession.mesocycleId);
+        if (!meso) {
+            container.innerHTML = '<div style="text-align: center; padding: 20px; color: var(--text-secondary);">Error: Mesociclo no encontrado</div>';
+            countEl.textContent = '0';
+            return;
+        }
+        
+        // Filtrar ejercicios disponibles del mesociclo
+        let availableExercises = meso.exercises.filter(mesoEx => !currentExerciseIds.has(mesoEx.exerciseId));
+        
+        // Aplicar filtro de búsqueda
+        const searchTerm = document.getElementById('available-exercises-search').value.toLowerCase();
+        if (searchTerm) {
+            availableExercises = availableExercises.filter(ex => 
+                ex.name.toLowerCase().includes(searchTerm)
+            );
+        }
+        
+        countEl.textContent = availableExercises.length;
+        
+        if (availableExercises.length === 0) {
+            container.innerHTML = `
+                <div style="text-align: center; padding: 40px 20px; color: var(--text-secondary);">
+                    <i class="fas fa-check-circle" style="font-size: 2rem; margin-bottom: 10px; display: block;"></i>
+                    ${searchTerm ? 'No hay ejercicios que coincidan con la búsqueda' : 'Todos los ejercicios del mesociclo están en la sesión'}
+                </div>
+            `;
+            return;
+        }
+        
+        container.innerHTML = availableExercises.map(ex => `
+            <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px; background: var(--card-bg); border-radius: 8px; margin-bottom: 8px; border: 1px solid var(--border-color);">
+                <div style="flex: 1;">
+                    <div style="font-weight: 500; color: var(--text-primary);">${ex.name}</div>
+                    <div style="font-size: 0.85rem; color: var(--text-secondary);">1RM: ${ex.rm}kg</div>
+                </div>
+                <button type="button" onclick="gymTracker.addExerciseToSession('${ex.exerciseId}')" 
+                        style="background: var(--success-color); color: white; border: none; padding: 8px 12px; border-radius: 6px; cursor: pointer; font-size: 0.85rem;">
+                    <i class="fas fa-plus"></i>
+                </button>
+            </div>
+        `).join('');
+    }
+
+    filterAvailableExercises() {
+        this.renderAvailableExercisesList();
+    }
+
+    removeExerciseFromSession(index) {
+        const exercise = this.tempSessionExercises[index];
+        const hasCompletedSets = exercise.sets && exercise.sets.some(s => s.completed);
+        
+        // Si tiene series completadas, pedir confirmación
+        if (hasCompletedSets) {
+            if (!confirm(`⚠️ "${exercise.name}" tiene series completadas. Si lo eliminas, se perderán todos los datos de esta sesión. ¿Continuar?`)) {
+                return;
+            }
+        }
+        
+        // Eliminar del array temporal
+        this.tempSessionExercises.splice(index, 1);
+        
+        // Actualizar vistas
+        this.renderCurrentSessionExercisesList();
+        this.renderAvailableExercisesList();
+        
+        this.showNotification(`"${exercise.name}" eliminado de la sesión`, 'info');
+    }
+
+    addExerciseToSession(exerciseId) {
+        // Obtener el ejercicio del mesociclo
+        const meso = this.mesocycles.find(m => m.id === this.currentSession.mesocycleId);
+        if (!meso) return;
+        
+        const mesoExercise = meso.exercises.find(ex => ex.exerciseId === exerciseId);
+        if (!mesoExercise) return;
+        
+        // Añadir al array temporal
+        this.tempSessionExercises.push({
+            exerciseId: mesoExercise.exerciseId,
+            name: mesoExercise.name,
+            rm: mesoExercise.rm,
+            categories: mesoExercise.categories || (mesoExercise.category ? [mesoExercise.category] : []),
+            sets: []
+        });
+        
+        // Actualizar vistas
+        this.renderCurrentSessionExercisesList();
+        this.renderAvailableExercisesList();
+        
+        this.showNotification(`"${mesoExercise.name}" añadido a la sesión`, 'success');
+    }
+
+    async saveSessionExercisesChanges() {
+        if (!this.currentSession) return;
+        
+        const originalCount = this.currentSession.exercises.length;
+        const newCount = this.tempSessionExercises.length;
+        
+        // Actualizar la sesión actual
+        this.currentSession.exercises = this.tempSessionExercises;
+        
+        // Guardar en storage
+        await this.storage.setItem('gym_current_session', JSON.stringify(this.currentSession));
+        
+        // Cerrar modal
+        this.closeModal('edit-session-exercises-modal');
+        
+        // Re-renderizar la sesión
+        this.renderSession();
+        
+        // Mostrar notificación
+        const diff = newCount - originalCount;
+        if (diff > 0) {
+            this.showNotification(`Se añadieron ${diff} ejercicio(s). Cambios guardados.`, 'success');
+        } else if (diff < 0) {
+            this.showNotification(`Se eliminaron ${Math.abs(diff)} ejercicio(s). Cambios guardados.`, 'success');
+        } else {
+            this.showNotification('Cambios guardados correctamente', 'success');
+        }
+    }
+
     renderSession() {
         const container = document.getElementById('session-content');
         
@@ -1206,8 +1396,13 @@ class GymTracker {
                     <strong style="font-size: 1.1rem;">📅 Semana ${weekNumber} - Sesión ${sessionNumber}${sessionName ? ': ' + sessionName : ''}</strong>
                     <span style="opacity: 0.9; margin-left: 10px;">${weekType}</span>
                 </div>
-                <div style="font-size: 0.9rem; opacity: 0.9;">
-                    Porcentajes: ${this.getProgressivePercentage(weekNumber, 0)}% → ${this.getProgressivePercentage(weekNumber, 3)}%
+                <div style="display: flex; align-items: center; gap: 15px; flex-wrap: wrap;">
+                    <div style="font-size: 0.9rem; opacity: 0.9;">
+                        Porcentajes: ${this.getProgressivePercentage(weekNumber, 0)}% → ${this.getProgressivePercentage(weekNumber, 3)}%
+                    </div>
+                    <button type="button" class="btn btn-secondary" onclick="gymTracker.openEditSessionExercisesModal()" style="background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.3); color: white; padding: 8px 15px; font-size: 0.85rem;">
+                        <i class="fas fa-edit"></i> Editar ejercicios
+                    </button>
                 </div>
             </div>
             <div class="session-exercises">

@@ -849,6 +849,60 @@
         </div>
     </div>
 
+    <!-- Modal para editar ejercicios de la sesión actual -->
+    <div id="edit-session-exercises-modal" class="modal modal-large">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3><i class="fas fa-edit"></i> Editar Ejercicios de la Sesión</h3>
+                <button type="button" class="close-btn" onclick="closeModal('edit-session-exercises-modal')">&times;</button>
+            </div>
+            <div style="padding: 25px; max-height: 70vh; overflow-y: auto;">
+                <p style="color: var(--text-secondary); margin-bottom: 20px;">
+                    <i class="fas fa-info-circle"></i> 
+                    Elimina ejercicios de la sesión actual o añade nuevos desde el mesociclo. 
+                    <strong style="color: var(--warning-color);">Las series completadas de ejercicios eliminados se perderán.</strong>
+                </p>
+                
+                <div id="session-exercises-container">
+                    <!-- Panel izquierdo: Ejercicios actuales -->
+                    <div>
+                        <h4 style="margin-bottom: 15px; color: var(--primary-light); display: flex; justify-content: space-between; align-items: center;">
+                            <span><i class="fas fa-list-check"></i> En esta sesión</span>
+                            <span id="current-exercises-count" style="font-size: 0.9rem; background: var(--primary-color); color: white; padding: 3px 10px; border-radius: 12px;">0</span>
+                        </h4>
+                        <div id="current-session-exercises-list" style="background: var(--bg-color); border-radius: 8px; padding: 15px; min-height: 300px; max-height: 400px; overflow-y: auto;">
+                            <!-- Se llena dinámicamente -->
+                        </div>
+                    </div>
+                    
+                    <!-- Panel derecho: Ejercicios disponibles -->
+                    <div>
+                        <h4 style="margin-bottom: 15px; color: var(--primary-light); display: flex; justify-content: space-between; align-items: center;">
+                            <span><i class="fas fa-plus-circle"></i> Disponibles</span>
+                            <span id="available-exercises-count" style="font-size: 0.9rem; background: var(--secondary-color); color: white; padding: 3px 10px; border-radius: 12px;">0</span>
+                        </h4>
+                        <div style="margin-bottom: 15px;">
+                            <input type="text" id="available-exercises-search" placeholder="Buscar ejercicio..." 
+                                   oninput="gymTracker.filterAvailableExercises()"
+                                   style="width: 100%; padding: 10px; background: var(--bg-color); border: 1px solid var(--border-color); border-radius: 8px; color: var(--text-primary);">
+                        </div>
+                        <div id="available-exercises-list" style="background: var(--bg-color); border-radius: 8px; padding: 15px; min-height: 300px; max-height: 340px; overflow-y: auto;">
+                            <!-- Se llena dinámicamente -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('edit-session-exercises-modal')">
+                    <i class="fas fa-times"></i> Cancelar
+                </button>
+                <button type="button" class="btn btn-primary" onclick="gymTracker.saveSessionExercisesChanges()">
+                    <i class="fas fa-save"></i> Guardar cambios
+                </button>
+            </div>
+        </div>
+    </div>
+
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="idbstorage.js"></script>
     <script src="app.js?v=2.0"></script>
