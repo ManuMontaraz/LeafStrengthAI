@@ -1620,29 +1620,27 @@ class GymTracker {
         this.currentSession.completed = true;
         this.currentSession.endDate = new Date().toISOString();
 
-        // Actualizar 1RM de los ejercicios basado en las series completadas
+        // Actualizar 1RM solo si se levantó un peso superior al actual (sin estimaciones)
         this.currentSession.exercises.forEach(sessionEx => {
             const exercise = this.exercises.find(e => e.id === sessionEx.exerciseId);
             if (exercise) {
-                // Buscar la serie con mayor estimación de 1RM usando la fórmula de Brzycki
-                let maxEstimatedRM = exercise.rm;
+                // Buscar el peso máximo real levantado
+                let maxLiftedWeight = 0;
 
                 sessionEx.sets.forEach(set => {
                     if (set.completed && set.weight && set.weight > 0) {
-                        const reps = set.targetReps || 1;
-                        // Fórmula de Brzycki: 1RM = peso / (1.0278 - 0.0278 * reps)
-                        const estimatedRM = Math.round(set.weight / (1.0278 - 0.0278 * reps));
-                        if (estimatedRM > maxEstimatedRM) {
-                            maxEstimatedRM = estimatedRM;
+                        // Solo considerar pesos reales, sin estimaciones
+                        if (set.weight > maxLiftedWeight) {
+                            maxLiftedWeight = set.weight;
                         }
                     }
                 });
 
-                // Actualizar el 1RM si se ha estimado uno mayor
-                if (maxEstimatedRM > exercise.rm) {
-                    exercise.rm = maxEstimatedRM;
+                // Actualizar el 1RM solo si se levantó un peso mayor al actual
+                if (maxLiftedWeight > exercise.rm) {
+                    exercise.rm = maxLiftedWeight;
                     // Actualizar también el RM en la sesión
-                    sessionEx.rm = maxEstimatedRM;
+                    sessionEx.rm = maxLiftedWeight;
                 }
             }
         });
