@@ -694,10 +694,107 @@
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" onclick="closeModal('meso-detail-modal')">Cerrar</button>
+                <button type="button" class="btn btn-primary" onclick="gymTracker.openEditMesocycleModal(gymTracker.currentMesoDetail)">
+                    <i class="fas fa-edit"></i> Editar
+                </button>
                 <button type="button" class="btn btn-danger" onclick="deleteCurrentMesocycle()">
                     <i class="fas fa-trash"></i> Eliminar
                 </button>
             </div>
+        </div>
+    </div>
+
+    <!-- Modal para editar mesociclo -->
+    <div id="edit-mesocycle-modal" class="modal modal-large">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3><i class="fas fa-edit"></i> Editar Mesociclo</h3>
+                <button type="button" class="close-btn" onclick="closeModal('edit-mesocycle-modal')">&times;</button>
+            </div>
+            <form id="edit-mesocycle-form" onsubmit="event.preventDefault(); gymTracker.updateMesocycle();">
+                <input type="hidden" id="edit-meso-id">
+                <div style="padding: 25px; max-height: 70vh; overflow-y: auto;">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="edit-meso-name">Nombre del mesociclo *</label>
+                            <input type="text" id="edit-meso-name" required placeholder="Ej: Volumen Piernas">
+                        </div>
+                        <div class="form-group">
+                            <label for="edit-meso-duration">Duración (semanas) *</label>
+                            <input type="number" id="edit-meso-duration" required min="1" max="12" value="4">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="edit-meso-objetivo">Objetivo</label>
+                            <select id="edit-meso-objetivo">
+                                <option value="mixed">Mixto</option>
+                                <option value="strength">Fuerza</option>
+                                <option value="hypertrophy">Hipertrofia</option>
+                                <option value="endurance">Resistencia</option>
+                                <option value="power">Potencia</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="edit-meso-max-exercises">Máx. ejercicios por sesión</label>
+                            <input type="number" id="edit-meso-max-exercises" min="1" max="20" value="6">
+                        </div>
+                        <div class="form-group">
+                            <label for="edit-meso-sessions-per-week">Sesiones por semana</label>
+                            <input type="number" id="edit-meso-sessions-per-week" min="1" max="7" value="3">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="edit-meso-description">Descripción</label>
+                        <textarea id="edit-meso-description" rows="2" placeholder="Objetivos, notas, etc."></textarea>
+                    </div>
+                    
+                    <div style="margin: 20px 0; padding: 15px; background: rgba(255, 193, 7, 0.1); border-radius: 8px; border-left: 4px solid #ffc107;">
+                        <p style="margin: 0; color: var(--text-secondary); font-size: 0.9rem;">
+                            <i class="fas fa-info-circle" style="color: #ffc107;"></i>
+                            <strong>Nota:</strong> El modo de división (split) no se puede editar para evitar inconsistencias con las sesiones existentes.
+                        </p>
+                    </div>
+
+                    <div class="exercises-selection" style="margin-top: 25px;">
+                        <h3><i class="fas fa-dumbbell"></i> Gestión de Ejercicios <span id="edit-meso-selected-count" style="font-size: 0.9rem; color: var(--primary-light);">(0 seleccionados)</span></h3>
+                        <p style="color: var(--text-secondary); margin-bottom: 15px; font-size: 0.9rem;">
+                            Marca o desmarca ejercicios para añadirlos o eliminarlos del mesociclo.
+                        </p>
+                        <div class="filter-row">
+                            <input type="text" id="edit-meso-exercise-search" placeholder="Buscar ejercicio..." oninput="gymTracker.filterEditMesoExercises()">
+                            <select id="edit-meso-exercise-filter" onchange="gymTracker.filterEditMesoExercises()">
+                                <option value="all">Todas las zonas</option>
+                                <option value="favorites">⭐ Favoritos</option>
+                                <option value="pecho">Pecho</option>
+                                <option value="espalda">Espalda</option>
+                                <option value="hombros">Hombros</option>
+                                <option value="brazos">Brazos</option>
+                                <option value="piernas">Piernas</option>
+                                <option value="core">Core</option>
+                                <option value="otros">Otros</option>
+                            </select>
+                        </div>
+                        <div class="filter-row" style="margin-top: 10px;">
+                            <button type="button" class="btn btn-secondary btn-small" onclick="gymTracker.selectAllEditMesoExercises()">
+                                <i class="fas fa-check-square"></i> Seleccionar todos visibles
+                            </button>
+                            <button type="button" class="btn btn-secondary btn-small" onclick="gymTracker.deselectAllEditMesoExercises()">
+                                <i class="fas fa-square"></i> Deseleccionar todos visibles
+                            </button>
+                        </div>
+                        <div id="edit-meso-exercises-list" class="checkbox-exercises-list" style="max-height: 300px; margin-top: 15px;">
+                            <!-- Lista de ejercicios se carga dinámicamente -->
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('edit-mesocycle-modal')">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save"></i> Guardar Cambios
+                    </button>
+                </div>
+            </form>
         </div>
     </div>
 

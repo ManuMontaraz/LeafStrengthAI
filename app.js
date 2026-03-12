@@ -938,6 +938,190 @@ class GymTracker {
         }
     }
 
+    // ==================== EDICIÓN DE MESOCICLOS ====================
+    openEditMesocycleModal(mesoId) {
+        const meso = this.mesocycles.find(m => m.id === mesoId);
+        if (!meso) return;
+
+        // Guardar referencia al mesociclo que se está editando
+        this.currentEditingMeso = mesoId;
+
+        // Llenar campos del formulario
+        document.getElementById('edit-meso-id').value = meso.id;
+        document.getElementById('edit-meso-name').value = meso.name;
+        document.getElementById('edit-meso-duration').value = meso.duration;
+        document.getElementById('edit-meso-objetivo').value = meso.objective || 'mixed';
+        document.getElementById('edit-meso-max-exercises').value = meso.maxExercisesPerSession || 6;
+        document.getElementById('edit-meso-sessions-per-week').value = meso.sessionsPerWeek || 3;
+        document.getElementById('edit-meso-description').value = meso.description || '';
+
+        // Renderizar lista de ejercicios
+        this.renderEditMesoExercises();
+
+        // Cerrar modal de detalle y abrir el de edición
+        this.closeModal('meso-detail-modal');
+        document.getElementById('edit-mesocycle-modal').classList.add('active');
+    }
+
+    renderEditMesoExercises() {
+        const meso = this.mesocycles.find(m => m.id === this.currentEditingMeso);
+        if (!meso) return;
+
+        const container = document.getElementById('edit-meso-exercises-list');
+        const selectedIds = new Set(meso.exercises.map(e => e.exerciseId));
+
+        container.innerHTML = this.exercises.map(ex => {
+            const isSelected = selectedIds.has(ex.id);
+            return `
+                <label class="checkbox-exercise-item">
+                    <input type="checkbox" value="${ex.id}" ${isSelected ? 'checked' : ''} 
+                           onchange="gymTracker.toggleEditMesoExercise('${ex.id}', this.checked)"
+                           style="width: 20px; height: 20px; margin-right: 12px; accent-color: var(--primary-color); cursor: pointer;">
+                    <div class="exercise-info" style="cursor: pointer;">
+                        <div class="exercise-name">${ex.name} ${isSelected ? '<span style="color: var(--success-color);">✓</span>' : ''}</div>
+                        <div class="exercise-rm">1RM: ${ex.rm}kg - ${this.getCategoryNames(ex.categories || (ex.category ? [ex.category] : []))}</div>
+                    </div>
+                </label>
+            `;
+        }).join('');
+
+        this.updateEditMesoSelectedCount();
+    }
+
+    toggleEditMesoExercise(exerciseId, isSelected) {
+        const meso = this.mesocycles.find(m => m.id === this.currentEditingMeso);
+        if (!meso) return;
+
+        if (isSelected) {
+            // Añadir ejercicio si no existe
+            if (!meso.exercises.find(e => e.exerciseId === exerciseId)) {
+                const exercise = this.exercises.find(e => e.id === exerciseId);
+                if (exercise) {
+                    meso.exercises.push({
+                        exerciseId: exercise.id,
+                        name: exercise.name,
+                        rm: exercise.rm,
+                        categories: exercise.categories || (exercise.category ? [exercise.category] : [])
+                    });
+                }
+            }
+        } else {
+            // Eliminar ejercicio
+            meso.exercises = meso.exercises.filter(e => e.exerciseId !== exerciseId);
+        }
+
+        // Actualizar UI
+        this.renderEditMesoExercises();
+    }
+
+    filterEditMesoExercises() {
+        const searchTerm = document.getElementById('edit-meso-exercise-search').value.toLowerCase();
+        const categoryFilter = document.getElementById('edit-meso-exercise-filter').value;
+
+        const items = document.querySelectorAll('#edit-meso-exercises-list .checkbox-item');
+        items.forEach(item => {
+            const checkbox = item.querySelector('input[type="checkbox"]');
+            const exerciseId = checkbox.value;
+            const exercise = this.exercises.find(e => e.id === exerciseId);
+            
+            if (!exercise) return;
+
+            const matchesSearch = exercise.name.toLowerCase().includes(searchTerm);
+            const matchesCategory = categoryFilter === 'all' || 
+                                   (categoryFilter === 'favorites' && exercise.favorite) ||
+                                   (exercise.categories && exercise.categories.includes(categoryFilter)) ||
+                                   (exercise.category === categoryFilter);
+
+            item.style.display = matchesSearch && matchesCategory ? 'flex' : 'none';
+        });
+    }
+
+    selectAllEditMesoExercises() {
+        const visibleItems = document.querySelectorAll('#edit-meso-exercises-list .checkbox-item:not([style*="display: none"]) input[type="checkbox"]');
+        visibleItems.forEach(checkbox => {
+            if (!checkbox.checked) {
+                checkbox.checked = true;
+                this.toggleEditMesoExercise(checkbox.value, true);
+            }
+        });
+    }
+
+    deselectAllEditMesoExercises() {
+        const visibleItems = document.querySelectorAll('#edit-meso-exercises-list .checkbox-item:not([style*="display: none"]) input[type="checkbox"]');
+        visibleItems.forEach(checkbox => {
+            if (checkbox.checked) {
+                checkbox.checked = false;
+                this.toggleEditMesoExercise(checkbox.value, false);
+            }
+        });
+    }
+
+    updateEditMesoSelectedCount() {
+        const meso = this.mesocycles.find(m => m.id === this.currentEditingMeso);
+        const count = meso ? meso.exercises.length : 0;
+        document.getElementById('edit-meso-selected-count').textContent = `(${count} seleccionados)`;
+    }
+
+    async updateMesocycle() {
+        const mesoId = document.getElementById('edit-meso-id').value;
+        const meso = this.mesocycles.find(m => m.id === mesoId);
+        if (!meso) return;
+
+        // Validaciones
+        const name = document.getElementById('edit-meso-name').value.trim();
+        const duration = parseInt(document.getElementById('edit-meso-duration').value);
+        const sessionsPerWeek = parseInt(document.getElementById('edit-meso-sessions-per-week').value);
+
+        if (!name) {
+            this.showNotification('El nombre es obligatorio', 'error');
+            return;
+        }
+
+        if (duration < 1 || duration > 12) {
+            this.showNotification('La duración debe estar entre 1 y 12 semanas', 'error');
+            return;
+        }
+
+        // Verificar que no se reduzca la duración por debajo de las sesiones ya completadas
+        const totalSessionsNeeded = duration * sessionsPerWeek;
+        if (meso.completedSessions > totalSessionsNeeded) {
+            this.showNotification(`No puedes reducir la duración porque ya has completado ${meso.completedSessions} sesiones`, 'error');
+            return;
+        }
+
+        if (meso.exercises.length === 0) {
+            this.showNotification('Debe haber al menos un ejercicio en el mesociclo', 'error');
+            return;
+        }
+
+        // Actualizar campos
+        meso.name = name;
+        meso.duration = duration;
+        meso.objective = document.getElementById('edit-meso-objetivo').value;
+        meso.maxExercisesPerSession = parseInt(document.getElementById('edit-meso-max-exercises').value);
+        meso.sessionsPerWeek = sessionsPerWeek;
+        meso.description = document.getElementById('edit-meso-description').value.trim();
+
+        // Actualizar estado si es necesario
+        if (meso.completedSessions >= totalSessionsNeeded && meso.status !== 'completed') {
+            meso.status = 'completed';
+        } else if (meso.completedSessions < totalSessionsNeeded && meso.status === 'completed') {
+            meso.status = 'active';
+        }
+
+        // Guardar cambios
+        await this.saveToStorage();
+
+        // Actualizar UI
+        this.renderMesocycles();
+        this.updateMesocycleSelect();
+        this.closeModal('edit-mesocycle-modal');
+        this.showNotification('Mesociclo actualizado correctamente', 'success');
+
+        // Limpiar referencia
+        this.currentEditingMeso = null;
+    }
+
     // ==================== SESIONES ====================
     async updateMesocycleSelect() {
         const select = document.getElementById('active-mesocycle');
@@ -1420,7 +1604,7 @@ class GymTracker {
                                     <div class="set-number">${setIndex + 1}${set.note ? ` <span style="font-size: 0.7rem; color: var(--primary-light); display: block;">${set.note}</span>` : ''}</div>
                                     <div class="set-field">
                                         <label>Peso (kg)</label>
-                                        <input type="number" value="${set.weight || ''}" 
+                                        <input type="number" value="${set.weight || set.suggestedWeight || ''}" 
                                                onchange="gymTracker.updateSet('${ex.exerciseId}', ${setIndex}, 'weight', this.value)"
                                                placeholder="${set.suggestedWeight || ''}">
                                     </div>
@@ -1532,8 +1716,13 @@ class GymTracker {
         if (!this.currentSetExercise) return;
         
         const percentage = parseFloat(document.getElementById('set-percentage').value);
-        const exercise = this.currentSession.exercises[this.currentSetExercise.exerciseIndex];
-        const weight = Math.round(exercise.rm * (percentage / 100));
+        const sessionExercise = this.currentSession.exercises[this.currentSetExercise.exerciseIndex];
+        
+        // Obtener el RM más actualizado del ejercicio base (no de la sesión)
+        const baseExercise = this.exercises.find(e => e.id === sessionExercise.exerciseId);
+        const currentRM = baseExercise ? baseExercise.rm : sessionExercise.rm;
+        
+        const weight = Math.round(currentRM * (percentage / 100));
         
         document.getElementById('calculated-weight').textContent = weight + ' kg';
     }
@@ -1544,8 +1733,13 @@ class GymTracker {
         const percentage = parseFloat(document.getElementById('set-percentage').value);
         const reps = parseInt(document.getElementById('set-reps').value);
 
-        const exercise = this.currentSession.exercises[this.currentSetExercise.exerciseIndex];
-        const suggestedWeight = Math.round(exercise.rm * (percentage / 100));
+        const sessionExercise = this.currentSession.exercises[this.currentSetExercise.exerciseIndex];
+        
+        // Obtener el RM más actualizado del ejercicio base (no de la sesión)
+        const baseExercise = this.exercises.find(e => e.id === sessionExercise.exerciseId);
+        const currentRM = baseExercise ? baseExercise.rm : sessionExercise.rm;
+        
+        const suggestedWeight = Math.round(currentRM * (percentage / 100));
 
         const newSet = {
             targetReps: reps,
@@ -1555,7 +1749,7 @@ class GymTracker {
             completed: false
         };
 
-        exercise.sets.push(newSet);
+        sessionExercise.sets.push(newSet);
 
         await this.storage.setItem('gym_current_session', JSON.stringify(this.currentSession));
         this.closeModal('set-modal');
@@ -1571,14 +1765,17 @@ class GymTracker {
     }
 
     async updateSetPercentage(exerciseId, setIndex, percentage) {
-        const exercise = this.currentSession.exercises.find(e => e.exerciseId === exerciseId);
-        if (exercise && exercise.sets[setIndex]) {
+        const sessionExercise = this.currentSession.exercises.find(e => e.exerciseId === exerciseId);
+        if (sessionExercise && sessionExercise.sets[setIndex]) {
             const newPercentage = percentage === '' ? '' : parseFloat(percentage);
-            exercise.sets[setIndex].percentage = newPercentage;
+            sessionExercise.sets[setIndex].percentage = newPercentage;
 
             // Recalcular peso sugerido basado en el nuevo porcentaje
+            // Usar el RM más actualizado del ejercicio base
             if (newPercentage && !isNaN(newPercentage)) {
-                exercise.sets[setIndex].suggestedWeight = Math.round(exercise.rm * (newPercentage / 100));
+                const baseExercise = this.exercises.find(e => e.id === exerciseId);
+                const currentRM = baseExercise ? baseExercise.rm : sessionExercise.rm;
+                sessionExercise.sets[setIndex].suggestedWeight = Math.round(currentRM * (newPercentage / 100));
             }
 
             await this.storage.setItem('gym_current_session', JSON.stringify(this.currentSession));
