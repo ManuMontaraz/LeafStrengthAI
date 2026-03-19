@@ -179,6 +179,7 @@ class GymTracker {
         const categories = Array.from(document.querySelectorAll('input[name="exercise-category"]:checked')).map(cb => cb.value);
         const rm = parseFloat(document.getElementById('exercise-rm').value);
         const favorite = document.getElementById('exercise-favorite').checked;
+        const exerciseType = document.getElementById('exercise-type').value || 'normal';
 
         if (categories.length === 0) {
             this.showNotification('Selecciona al menos una categoría', 'warning');
@@ -191,6 +192,7 @@ class GymTracker {
             categories,
             rm,
             favorite,
+            exerciseType,
             createdAt: new Date().toISOString()
         };
 
@@ -266,6 +268,10 @@ class GymTracker {
                 delete ex.category;
                 needsMigration = true;
             }
+            if (!ex.exerciseType) {
+                ex.exerciseType = 'normal';
+                needsMigration = true;
+            }
         });
         if (needsMigration) {
             await this.saveToStorage();
@@ -316,6 +322,7 @@ class GymTracker {
         document.getElementById('edit-exercise-name').value = exercise.name;
         document.getElementById('edit-exercise-rm').value = exercise.rm;
         document.getElementById('edit-exercise-favorite').checked = exercise.favorite;
+        document.getElementById('edit-exercise-type').value = exercise.exerciseType || 'normal';
 
         // Configurar checkboxes de categorías
         const checkboxes = document.querySelectorAll('input[name="edit-exercise-category"]');
@@ -335,6 +342,7 @@ class GymTracker {
             const newCategories = Array.from(document.querySelectorAll('input[name="edit-exercise-category"]:checked')).map(cb => cb.value);
             const newRM = parseFloat(document.getElementById('edit-exercise-rm').value);
             const newFavorite = document.getElementById('edit-exercise-favorite').checked;
+            const newExerciseType = document.getElementById('edit-exercise-type').value || 'normal';
 
             if (newCategories.length === 0) {
                 this.showNotification('Selecciona al menos una categoría', 'warning');
@@ -345,39 +353,43 @@ class GymTracker {
             exercise.categories = newCategories;
             exercise.rm = newRM;
             exercise.favorite = newFavorite;
+            exercise.exerciseType = newExerciseType;
             delete exercise.category; // Eliminar campo antiguo si existe
 
-            // Actualizar el 1RM en todos los mesociclos que contienen este ejercicio
+            // Actualizar el ejercicio en todos los mesociclos que lo contienen
             this.mesocycles.forEach(meso => {
                 meso.exercises.forEach(mesoEx => {
                     if (mesoEx.exerciseId === id || mesoEx.id === id) {
                         mesoEx.name = newName;
                         mesoEx.categories = [...newCategories];
                         mesoEx.rm = newRM;
+                        mesoEx.exerciseType = newExerciseType;
                         delete mesoEx.category;
                     }
                 });
             });
 
-            // Actualizar el 1RM en todas las sesiones completadas que contienen este ejercicio
+            // Actualizar el ejercicio en todas las sesiones completadas
             this.sessions.forEach(session => {
                 session.exercises.forEach(sessionEx => {
                     if (sessionEx.exerciseId === id || sessionEx.id === id) {
                         sessionEx.name = newName;
                         sessionEx.categories = [...newCategories];
                         sessionEx.rm = newRM;
+                        sessionEx.exerciseType = newExerciseType;
                         delete sessionEx.category;
                     }
                 });
             });
 
-            // Actualizar el 1RM en la sesión actualmente cargada (si existe)
+            // Actualizar el ejercicio en la sesión actual (si existe)
             if (this.currentSession) {
                 this.currentSession.exercises.forEach(sessionEx => {
                     if (sessionEx.exerciseId === id || sessionEx.id === id) {
                         sessionEx.name = newName;
                         sessionEx.categories = [...newCategories];
                         sessionEx.rm = newRM;
+                        sessionEx.exerciseType = newExerciseType;
                         delete sessionEx.category;
 
                         // Recalcular el peso sugerido de cada serie basado en el nuevo 1RM
@@ -439,6 +451,39 @@ class GymTracker {
         document.getElementById('rm-70').textContent = Math.round(rm * 0.70);
 
         document.getElementById('rm-result').classList.remove('hidden');
+    }
+
+    // ==================== CÁLCULO DE DESCANSO ====================
+    calculateRestTime(objective, exerciseType) {
+        // Base según objetivo del mesociclo (en segundos)
+        const baseRest = {
+            strength: 180,      // 3 min
+            power: 240,         // 4 min
+            hypertrophy: 120,   // 2 min
+            endurance: 60,      // 1 min
+            deload: 90,         // 1.5 min
+            mixed: 120,         // 2 min
+            test1rm: 300        // 5 min
+        };
+
+        // Multiplicador según tipo de ejercicio
+        const typeMultiplier = {
+            heavy: 1.5,    // +50%
+            normal: 1.0,   // base
+            light: 0.7     // -30%
+        };
+
+        const base = baseRest[objective] || 120;
+        const multiplier = typeMultiplier[exerciseType] || 1.0;
+        const restSeconds = Math.round(base * multiplier);
+
+        // Convertir a rango aproximado
+        if (restSeconds >= 240) return "4-5 min";
+        if (restSeconds >= 180) return "3-4 min";
+        if (restSeconds >= 120) return "2-3 min";
+        if (restSeconds >= 90) return "90s-2 min";
+        if (restSeconds >= 60) return "60-90s";
+        return "30-45s";
     }
 
     // ==================== CONFIGURACIÓN DE MODOS DE DIVISIÓN ====================
@@ -742,6 +787,7 @@ class GymTracker {
                     name: exercise.name,
                     rm: exercise.rm,
                     categories: exercise.categories || [],
+                    exerciseType: exercise.exerciseType || 'normal',
                     sets: []
                 });
             }
@@ -1227,6 +1273,7 @@ class GymTracker {
                 name: ex.name,
                 rm: ex.rm,
                 categories: ex.categories || (ex.category ? [ex.category] : []),
+                exerciseType: ex.exerciseType || 'normal',
                 sets: []
             })),
             completed: false
@@ -1320,12 +1367,16 @@ class GymTracker {
         const sessionName = this.getSessionNameForSplit(meso.split, sessionNumber);
 
         // Crear array de ejercicios seleccionados
-        const selectedExercises = Array.from(selectedCheckboxes).map(cb => ({
-            exerciseId: cb.value,
-            name: cb.dataset.name,
-            rm: parseFloat(cb.dataset.rm),
-            sets: []
-        }));
+        const selectedExercises = Array.from(selectedCheckboxes).map(cb => {
+            const mesoEx = meso.exercises.find(e => e.exerciseId === cb.value);
+            return {
+                exerciseId: cb.value,
+                name: cb.dataset.name,
+                rm: parseFloat(cb.dataset.rm),
+                exerciseType: mesoEx ? (mesoEx.exerciseType || 'normal') : 'normal',
+                sets: []
+            };
+        });
 
         this.currentSession = {
             id: this.generateId(),
@@ -1513,6 +1564,7 @@ class GymTracker {
             name: mesoExercise.name,
             rm: mesoExercise.rm,
             categories: mesoExercise.categories || (mesoExercise.category ? [mesoExercise.category] : []),
+            exerciseType: mesoExercise.exerciseType || 'normal',
             sets: []
         });
         
@@ -1573,6 +1625,7 @@ class GymTracker {
         const sessionsPerWeek = meso ? (meso.sessionsPerWeek || 3) : 3;
         const weekNumber = this.getWeekNumber(sessionNumber, sessionsPerWeek);
         const weekType = this.getWeekType(weekNumber);
+        const objective = meso ? meso.objective : 'mixed';
 
         container.innerHTML = `
             <div class="session-info-banner" style="background: linear-gradient(135deg, var(--primary-color), var(--primary-dark)); padding: 15px 20px; border-radius: 8px; margin-bottom: 20px; color: white; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
@@ -1582,7 +1635,7 @@ class GymTracker {
                 </div>
                 <div style="display: flex; align-items: center; gap: 15px; flex-wrap: wrap;">
                     <div style="font-size: 0.9rem; opacity: 0.9;">
-                        Porcentajes: ${this.getProgressivePercentage(weekNumber, 0)}% → ${this.getProgressivePercentage(weekNumber, 3)}%
+                        Porcentajes: ${this.getProgressivePercentage(weekNumber, 0, objective)}% → ${this.getProgressivePercentage(weekNumber, 3, objective)}%
                     </div>
                     <button type="button" class="btn btn-secondary" onclick="gymTracker.openEditSessionExercisesModal()" style="background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.3); color: white; padding: 8px 15px; font-size: 0.85rem;">
                         <i class="fas fa-edit"></i> Editar ejercicios
@@ -1620,6 +1673,18 @@ class GymTracker {
                                                onchange="gymTracker.updateSet('${ex.exerciseId}', ${setIndex}, 'targetReps', this.value)"
                                                readonly style="background: var(--card-bg-hover); color: var(--text-secondary);">
                                     </div>
+                                    <div class="set-field">
+                                        <label>Descanso</label>
+                                        <select onchange="gymTracker.updateSetRestTime('${ex.exerciseId}', ${setIndex}, this.value)"
+                                                style="background: var(--card-bg-hover); color: var(--text-secondary); border: 1px solid var(--border-color); border-radius: 6px; padding: 8px; font-size: 0.85rem; cursor: pointer; min-width: 100px;">
+                                            <option value="30-45s" ${set.restTime === '30-45s' ? 'selected' : ''}>30-45s</option>
+                                            <option value="60-90s" ${set.restTime === '60-90s' ? 'selected' : ''}>60-90s</option>
+                                            <option value="90s-2 min" ${set.restTime === '90s-2 min' ? 'selected' : ''}>90s-2 min</option>
+                                            <option value="2-3 min" ${set.restTime === '2-3 min' ? 'selected' : ''}>2-3 min</option>
+                                            <option value="3-4 min" ${set.restTime === '3-4 min' ? 'selected' : ''}>3-4 min</option>
+                                            <option value="4-5 min" ${set.restTime === '4-5 min' ? 'selected' : ''}>4-5 min</option>
+                                        </select>
+                                    </div>
                                     <div class="set-completed">
                                         <input type="checkbox" ${set.completed ? 'checked' : ''} 
                                                onchange="gymTracker.toggleSetComplete('${ex.exerciseId}', ${setIndex})"
@@ -1647,12 +1712,8 @@ class GymTracker {
         `;
     }
 
-    getProgressivePercentage(weekNumber, setIndex, mesocycleDuration = 4) {
+    getProgressivePercentage(weekNumber, setIndex, objective = 'mixed', mesocycleDuration = 4) {
         // Factores de progresión según la semana del mesociclo
-        // Semana 1: 0.95 (volumen alto, intensidad moderada)
-        // Semana 2: 1.00 (volumen moderado, intensidad alta)
-        // Semana 3: 1.05 (intensidad máxima)
-        // Semana 4: 0.90 (descarga/deload)
         const weekMultipliers = {
             1: 0.95,  // Semana 1: Acumulación
             2: 1.00,  // Semana 2: Intensificación
@@ -1660,20 +1721,31 @@ class GymTracker {
             4: 0.90   // Semana 4: Descarga
         };
 
+        // Porcentajes base según objetivo del mesociclo
+        const basePercentages = {
+            strength: [80, 85, 90, 93, 95, 95, 95, 95],     // Fuerza: alta intensidad
+            power: [82, 87, 92, 95, 97, 97, 97, 97],       // Potencia: máxima intensidad
+            hypertrophy: [70, 75, 80, 85, 85, 85, 85, 85], // Hipertrofia: moderada
+            endurance: [60, 65, 70, 75, 75, 75, 75, 75],    // Resistencia: baja intensidad
+            deload: [55, 60, 65, 70, 70, 70, 70, 70],      // Descarga: muy baja
+            mixed: [72, 77, 82, 87, 87, 87, 87, 87],       // Mixto: entre hipertrofia y fuerza
+            test1rm: [75, 85, 93, 102, 105, 105, 105, 105] // Test 1RM: progresión hasta >100%
+        };
+
         // Para mesociclos más largos, extender el patrón
         const cyclePosition = ((weekNumber - 1) % 4) + 1;
         let weekMultiplier = weekMultipliers[cyclePosition] || 1.00;
 
-        // Escalera ascendente dentro de la sesión
-        // Serie 1: 70%, Serie 2: 75%, Serie 3: 80%, Serie 4: 85%
-        const setPercentages = [70, 75, 80, 85, 85, 85, 85, 85];
+        // Obtener porcentajes base según objetivo
+        const setPercentages = basePercentages[objective] || basePercentages.mixed;
         const basePercentage = setPercentages[Math.min(setIndex, setPercentages.length - 1)];
 
         // Aplicar multiplicador de semana
         const adjustedPercentage = Math.round(basePercentage * weekMultiplier);
 
-        // Limitar entre 50% y 95%
-        return Math.max(50, Math.min(95, adjustedPercentage));
+        // Limitar entre 50% y 100% (permitir hasta 100% para tests)
+        const maxPercentage = objective === 'test1rm' ? 110 : 100;
+        return Math.max(50, Math.min(maxPercentage, adjustedPercentage));
     }
 
     openSetModal(exerciseId, exerciseIndex) {
@@ -1687,9 +1759,10 @@ class GymTracker {
         const meso = this.mesocycles.find(m => m.id === this.currentSession.mesocycleId);
         const sessionsPerWeek = meso ? (meso.sessionsPerWeek || 3) : 3;
         const weekNumber = this.getWeekNumber(sessionNumber, sessionsPerWeek);
+        const objective = meso ? meso.objective : 'mixed';
 
-        // Obtener porcentaje progresivo basado en semana y serie
-        const defaultPercentage = this.getProgressivePercentage(weekNumber, currentSetsCount);
+        // Obtener porcentaje progresivo basado en semana, serie y objetivo
+        const defaultPercentage = this.getProgressivePercentage(weekNumber, currentSetsCount, objective);
 
         // Sugerir reps basadas en el porcentaje
         const suggestedReps = defaultPercentage >= 85 ? 5 : (defaultPercentage >= 80 ? 8 : 10);
@@ -1741,11 +1814,18 @@ class GymTracker {
         
         const suggestedWeight = Math.round(currentRM * (percentage / 100));
 
+        // Obtener objetivo del mesociclo y tipo de ejercicio para calcular descanso
+        const meso = this.mesocycles.find(m => m.id === this.currentSession.mesocycleId);
+        const objective = meso ? meso.objective : 'mixed';
+        const exerciseType = baseExercise ? baseExercise.exerciseType : 'normal';
+        const restTime = this.calculateRestTime(objective, exerciseType);
+
         const newSet = {
             targetReps: reps,
             suggestedWeight: suggestedWeight,
             percentage: percentage,
             weight: suggestedWeight,
+            restTime: restTime,
             completed: false
         };
 
@@ -1780,6 +1860,14 @@ class GymTracker {
 
             await this.storage.setItem('gym_current_session', JSON.stringify(this.currentSession));
             this.renderSession();
+        }
+    }
+
+    async updateSetRestTime(exerciseId, setIndex, restTime) {
+        const exercise = this.currentSession.exercises.find(e => e.exerciseId === exerciseId);
+        if (exercise && exercise.sets[setIndex]) {
+            exercise.sets[setIndex].restTime = restTime;
+            await this.storage.setItem('gym_current_session', JSON.stringify(this.currentSession));
         }
     }
 
@@ -2843,6 +2931,14 @@ async function generateAutoSets() {
     const mult = intensityMultipliers[intensity];
 
     gymTracker.currentSession.exercises.forEach((ex, exIndex) => {
+        // Obtener el RM más actualizado del ejercicio base
+        const baseExercise = gymTracker.exercises.find(e => e.id === ex.exerciseId);
+        const currentRM = baseExercise ? baseExercise.rm : ex.rm;
+
+        // Calcular tiempo de descanso para este ejercicio
+        const exerciseType = baseExercise ? baseExercise.exerciseType : 'normal';
+        const restTime = gymTracker.calculateRestTime(targetObjective, exerciseType);
+
         // Analizar historial del ejercicio
         const exerciseHistory = gymTracker.sessions.flatMap(s =>
             s.exercises.filter(e => e.exerciseId === ex.exerciseId)
@@ -2851,7 +2947,7 @@ async function generateAutoSets() {
         );
 
         // Calcular peso base de referencia (última serie/working set) sin ajuste de progresión de sesión
-        let referenceWeight = Math.round(ex.rm * (85 / 100) * mult.percentage);
+        let referenceWeight = Math.round(currentRM * (85 / 100) * mult.percentage);
 
         // Si hay historial, ajustar basado en el último rendimiento
         if (exerciseHistory.length > 0) {
@@ -2928,13 +3024,14 @@ async function generateAutoSets() {
                 // Permitir hasta 110% para el test de 1RM
                 adjustedPercentage = Math.max(50, Math.min(110, adjustedPercentage));
                 
-                let setWeight = Math.round(ex.rm * (adjustedPercentage / 100));
+                let setWeight = Math.round(currentRM * (adjustedPercentage / 100));
                 
                 ex.sets.push({
                     targetReps: testSet.reps,
                     suggestedWeight: setWeight,
                     percentage: adjustedPercentage,
                     weight: setWeight,
+                    restTime: restTime,
                     completed: false,
                     note: testSet.note
                 });
@@ -2944,16 +3041,18 @@ async function generateAutoSets() {
             let baseReps = Math.round(config.reps * mult.reps);
             
             for (let i = 0; i < numSets; i++) {
-                // Usar la función getProgressivePercentage que considera la semana del mesociclo
-                let setPercentage = gymTracker.getProgressivePercentage(weekNumber, i);
+                // Usar la función getProgressivePercentage con el objetivo del mesociclo
+                let setPercentage = gymTracker.getProgressivePercentage(weekNumber, i, targetObjective);
                 let setReps = baseReps;
 
                 // Aplicar ajuste de intensidad al porcentaje
                 setPercentage = Math.round(setPercentage * mult.percentage);
-                setPercentage = Math.max(50, Math.min(95, setPercentage));
+                // Permitir hasta 100% para fuerza/potencia, 95% para otros
+                const maxPercentage = (targetObjective === 'strength' || targetObjective === 'power') ? 100 : 95;
+                setPercentage = Math.max(50, Math.min(maxPercentage, setPercentage));
 
                 // Calcular peso
-                let setWeight = Math.round(ex.rm * (setPercentage / 100));
+                let setWeight = Math.round(currentRM * (setPercentage / 100));
 
                 // Ajustar según el objetivo
                 if (targetObjective === 'strength' || targetObjective === 'power') {
@@ -2978,16 +3077,14 @@ async function generateAutoSets() {
                     setPercentage = Math.max(50, setPercentage - 20);
                 }
                 
-                // Ajustar para que la última serie coincida con el peso de trabajo calculado
-                if (i === numSets - 1) {
-                    setWeight = referenceWeight;
-                }
+
                 
                 ex.sets.push({
                     targetReps: setReps,
                     suggestedWeight: setWeight,
                     percentage: setPercentage,
                     weight: setWeight,
+                    restTime: restTime,
                     completed: false
                 });
             }
